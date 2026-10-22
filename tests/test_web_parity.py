@@ -76,3 +76,61 @@ def test_ltown_export_carries_eupl_notice():
         pytest.skip("L-TOWN.inp not present")
     from wateront.pipeline import build_knowledge_graph
     assert "EUPL-1.2" in export_payload(build_knowledge_graph(path, verbose=False))["notice"]
+
+
+def run_js_edits(payload, edits, tmp_path):
+    tpl = open(os.path.join(ROOT, "wateront", "web_template.html"), encoding="utf-8").read()
+    logic = re.search(r"// LOGIC START[^\n]*\n(.*?)// LOGIC END", tpl, re.S).group(1)
+    (tmp_path / "data.json").write_text(json.dumps(payload))
+    (tmp_path / "edits.json").write_text(json.dumps(edits))
+    script = logic + """
+const fs = require('fs');
+const D = JSON.parse(fs.readFileSync(process.argv[2], 'utf8'));
+const edits = JSON.parse(fs.readFileSync(process.argv[3], 'utf8'));
+const maxDiff = Math.max(...D.pipes.map(p => Math.abs(pofKmOf(p, D.config) - p.pofKm)));
+const idx = Object.fromEntries(D.pipes.map((p, i) => [p.id, i]));
+for (const [id, e] of Object.entries(edits)) D.pipes[idx[id]] = applyEdit(D.pipes[idx[id]], e, D.config);
+const pol = defaultPolicy(D.config);
+console.log(JSON.stringify({maxDiff, register: toRegisterCsv(D.pipes, D.config),
+  actions: D.pipes.map(p => decide(p, pol).action),
+  parsed: parseRegister(toRegisterCsv(D.pipes, D.config), D.pipes.map(p => p.id), D.config)}));
+"""
+    (tmp_path / "e.js").write_text(script)
+    out = subprocess.run(["node", str(tmp_path / "e.js"), str(tmp_path / "data.json"), str(tmp_path / "edits.json")],
+                         capture_output=True, text=True, check=True)
+    return json.loads(out.stdout)
+
+
+def test_browser_edits_match_python_rebuild(tmp_path):
+    """Edit pipes in the browser logic, export the asset register, rebuild in Python with
+    --assets: every pipe's recommended action must agree."""
+    from wateront.pipeline import build_knowledge_graph
+    res = build_knowledge_graph("Net3", verbose=False)
+    payload = export_payload(res)
+    ids = [p["id"] for p in payload["pipes"]]
+    edits = {ids[0]: {"installYear": 1925, "mat": "CI", "grade": 5, "failYears": [2010, 2015, 2021]},
+             ids[5]: {"installYear": 2010, "mat": "HDPE", "grade": 1, "failYears": [], "insp": 2025},
+             ids[9]: {"soil": "High", "insp": 1990}}
+    js = run_js_edits(payload, edits, tmp_path)
+    assert js["maxDiff"] <= 5e-7          # JS PoF formula == Python, up to the 6-dp rounding in the export
+    assert not js["parsed"]["errors"] and len(js["parsed"]["edits"]) == len(ids)   # round trip parses
+    reg = tmp_path / "register.csv"
+    reg.write_text(js["register"])
+    rebuilt = build_knowledge_graph("Net3", asset_csv=str(reg), verbose=False)
+    py = {d.facts["pipe"]: d.action for d in rebuilt.decisions}
+    assert js["actions"] == [py[i] for i in ids]
+    assert any(a != p["pyAction"] for a, p in zip(js["actions"], payload["pipes"]))  # edits mattered
+
+
+def test_partial_register_keeps_blank_cells(tmp_path):
+    from wateront.pipeline import build_knowledge_graph
+    base = build_knowledge_graph("Net3", verbose=False).assets.set_index("pipe")
+    reg = tmp_path / "r.csv"
+    reg.write_text("pipe,install_year,material,condition_grade,failure_years\n101,1930,CI,,\n105,,,2,none\n")
+    a = build_knowledge_graph("Net3", asset_csv=str(reg), verbose=False).assets.set_index("pipe")
+    assert a.loc["101", "install_year"] == 1930 and a.loc["101", "condition_grade"] == base.loc["101", "condition_grade"]
+    assert a.loc["105", "install_year"] == base.loc["105", "install_year"] and a.loc["105", "failure_years"] == []
+    bad = tmp_path / "bad.csv"
+    bad.write_text("pipe,material,condition_grade\n101,Wood,9\n")
+    with pytest.raises(ValueError, match="Wood.*condition_grade|condition_grade.*Wood|material"):
+        build_knowledge_graph("Net3", asset_csv=str(bad), verbose=False)

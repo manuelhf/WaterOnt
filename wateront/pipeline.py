@@ -7,8 +7,9 @@ from dataclasses import dataclass
 import pandas as pd
 import wntr
 
-from .asset import (apply_failure_history, build_asset_layer, load_asset_table,
-                    load_failure_events, synthesise_asset_table)
+from .asset import (apply_asset_overrides, apply_failure_history, build_asset_layer,
+                    load_asset_overrides, load_facilities, load_failure_events,
+                    synthesise_asset_table)
 from .config import Config
 from .decision import Decision, build_decision_layer, load_guidelines
 from .kg import KnowledgeGraph
@@ -41,7 +42,7 @@ def resolve_inp(name_or_path: str) -> str:
 
 def build_knowledge_graph(inp: str, cfg: Config | None = None, asset_csv: str | None = None,
                           guidelines_json: str | None = None, failures_csv: str | None = None,
-                          verbose: bool = True) -> BuildResult:
+                          facilities_csv: str | None = None, verbose: bool = True) -> BuildResult:
     cfg = cfg or Config()
     path = resolve_inp(inp)
     network_id = os.path.splitext(os.path.basename(path))[0]
@@ -57,20 +58,15 @@ def build_knowledge_graph(inp: str, cfg: Config | None = None, asset_csv: str | 
         f"{n_sensors} sensors, supply zones: {zones}")
 
     assets = synthesise_asset_table(wn, cfg)
-    if asset_csv:  # real register overrides priors wherever it has a row
-        real = load_asset_table(asset_csv).set_index("pipe")
-        known = set(assets["pipe"])
-        unknown = set(real.index) - known
+    if asset_csv:  # real register overrides priors wherever it has a value
+        overrides = load_asset_overrides(asset_csv, cfg)
+        unknown = set(overrides) - set(assets["pipe"])
         if unknown:
-            log(f"[asset]    ignoring {len(unknown)} register rows with no matching pipe")
-        rows = assets.to_dict("records")
-        hit = []
-        for row in rows:
-            if row["pipe"] in real.index:
-                row.update(real.loc[row["pipe"]].to_dict())
-                hit.append(row["pipe"])
-        assets = pd.DataFrame(rows, columns=assets.columns)
-        log(f"[asset]    {len(hit)}/{len(assets)} pipes from register, rest from priors")
+            log(f"[asset]    ignoring {len(unknown)} register rows with no matching pipe, "
+                f"e.g. {sorted(unknown)[:3]}")
+        assets = apply_asset_overrides(assets, overrides, cfg)
+        log(f"[asset]    {len(set(overrides) - unknown)}/{len(assets)} pipes updated from register, "
+            f"rest from priors")
     if failures_csv:
         events = load_failure_events(failures_csv)
         assets = apply_failure_history(assets, events)
@@ -82,7 +78,10 @@ def build_knowledge_graph(inp: str, cfg: Config | None = None, asset_csv: str | 
     log(f"[asset]    {len(kg.nodes('AssetRecord'))} asset records, "
         f"{len(kg.nodes('FailureEvent'))} failure events")
 
-    facilities = choose_critical_facilities(wn, cfg)
+    facilities = choose_critical_facilities(
+        wn, cfg, load_facilities(facilities_csv) if facilities_csv else None)
+    if facilities_csv:
+        log(f"[risk]     critical customers from {facilities_csv}: {len(facilities)}")
     monitored = pipes_near_sensor(wn, kg, "PressureSensor", hops=2) if kg.nodes("PressureSensor") else None
     risk, node_state = compute_risk_table(wn, assets, cfg, facilities, monitored)
     if monitored is None:   # no sensor metadata: treat monitoring status as unknown, not absent

@@ -42,6 +42,7 @@ def export_payload(res: BuildResult, cfg: Config | None = None) -> dict:
 
     risk = res.risk
     actions = {d.facts["uid"]: d.action for d in res.decisions}
+    assets = res.assets.set_index("pipe")
     pipes = []
     for p in kg.nodes("Pipe"):
         f = pipe_facts(kg, p)
@@ -59,6 +60,9 @@ def export_payload(res: BuildResult, cfg: Config | None = None) -> dict:
             mon=f["monitored"], zone=f["zone"], fac=f["facilities"],
             minP=round(min(float(f["min_end_pressure"]), 9999.0), 2),
             sensors=sensors_at.get(name, []),
+            soil=str(assets.loc[name, "soil_corrosivity"]),
+            failYears=[int(y) for y in assets.loc[name, "failure_years"]],
+            failModes=[str(m) for m in assets.loc[name, "failure_modes"]],
             # Python's decision, used by the parity test and shown as the baseline
             pyAction=actions[p],
         ))
@@ -86,7 +90,12 @@ def export_payload(res: BuildResult, cfg: Config | None = None) -> dict:
         config=dict(referenceYear=cfg.reference_year, pofBands=[t for t, _ in cfg.pof_bands[:3]],
                     designLife=cfg.design_life, inspectionInterval=cfg.inspection_interval,
                     minServicePressure=cfg.min_service_pressure_m,
-                    pressureMargin=cfg.pressure_margin_m, seed=cfg.seed),
+                    pressureMargin=cfg.pressure_margin_m, seed=cfg.seed,
+                    # failure model, so the browser can recompute PoF after an edit
+                    weibull={m: list(v) for m, v in cfg.weibull.items()},
+                    hazardScale=cfg.hazard_scale, failureCoef=cfg.failure_count_hazard_coef,
+                    horizon=cfg.planning_horizon_years, soilFactor=cfg.soil_corrosivity_factor),
+        edited=[],
     )
 
 

@@ -91,14 +91,98 @@ def synthesise_asset_table(wn: wntr.network.WaterNetworkModel, cfg: Config) -> p
     return pd.DataFrame(rows, columns=ASSET_COLUMNS)
 
 
+REGISTER_INT = ("install_year", "condition_grade", "last_inspection_year")
+REGISTER_TEXT = ("material", "lining", "joint", "soil_corrosivity")
+
+
+def load_asset_overrides(path: str, cfg: Config | None = None) -> dict[str, dict]:
+    """Read an asset register as per-pipe overrides.
+
+    Any subset of the columns in `data/asset_register_template.csv` may be present, and
+    any cell may be blank: blank means "not known, keep the current value". For
+    `failure_years` write years separated by ';', or `none` for a pipe with no recorded
+    failures. Raises ValueError listing every invalid cell, so a register is never
+    half-applied."""
+    cfg = cfg or Config()
+    df = pd.read_csv(path, dtype=str, keep_default_na=False).rename(columns=str.strip)
+    if "pipe" not in df.columns:
+        raise ValueError(f"{path}: needs a 'pipe' column")
+    out, errors = {}, []
+    for n, row in enumerate(df.to_dict("records"), start=2):
+        pipe = row["pipe"].strip()
+        if not pipe:
+            continue
+        rec: dict = {}
+        for col in REGISTER_INT:
+            v = row.get(col, "").strip()
+            if v:
+                try:
+                    rec[col] = int(float(v))
+                except ValueError:
+                    errors.append(f"line {n}, {col}: '{v}' is not a number")
+        for col in REGISTER_TEXT:
+            v = row.get(col, "").strip()
+            if v:
+                rec[col] = v
+        if "material" in rec and rec["material"] not in cfg.weibull:
+            errors.append(f"line {n}, material: '{rec['material']}' is not one of {sorted(cfg.weibull)}")
+        if "soil_corrosivity" in rec and rec["soil_corrosivity"] not in cfg.soil_corrosivity_factor:
+            errors.append(f"line {n}, soil_corrosivity: use one of {sorted(cfg.soil_corrosivity_factor)}")
+        if "condition_grade" in rec and not 1 <= rec["condition_grade"] <= 5:
+            errors.append(f"line {n}, condition_grade: must be 1 to 5")
+        fy = row.get("failure_years", "").strip()
+        if fy:
+            if fy.lower() in ("none", "0"):
+                rec["failure_years"], rec["failure_modes"] = [], []
+            else:
+                try:
+                    years = [int(float(x)) for x in fy.split(";") if x.strip()]
+                except ValueError:
+                    errors.append(f"line {n}, failure_years: use years separated by ';', or 'none'")
+                    years = []
+                modes = [m.strip() for m in row.get("failure_modes", "").split(";") if m.strip()]
+                rec["failure_years"] = years
+                rec["failure_modes"] = (modes + ["Burst"] * len(years))[: len(years)]
+        if "material" in rec:
+            rec["material_source"] = "register"
+        out[pipe] = rec
+    if errors:
+        raise ValueError(f"{path}: " + "; ".join(errors[:20]) + (" ..." if len(errors) > 20 else ""))
+    return out
+
+
+def apply_asset_overrides(assets: pd.DataFrame, overrides: dict[str, dict], cfg: Config | None = None) -> pd.DataFrame:
+    cfg = cfg or Config()
+    rows = assets.to_dict("records")
+    for row in rows:
+        rec = overrides.get(row["pipe"])
+        if not rec:
+            continue
+        row.update(rec)
+        if "material" in rec:          # derived attributes follow the material unless given
+            if "lining" not in rec:
+                row["lining"] = cfg.lining[rec["material"]]
+            if "joint" not in rec:
+                row["joint"] = cfg.joint[rec["material"]]
+        if row["last_inspection_year"] < row["install_year"]:
+            row["last_inspection_year"] = row["install_year"]
+    return pd.DataFrame(rows, columns=assets.columns)
+
+
 def load_asset_table(path: str) -> pd.DataFrame:
-    """Load a real asset register. `failure_years`/`failure_modes` are ';'-separated."""
-    df = pd.read_csv(path, dtype={"pipe": str})
-    for col in ("failure_years", "failure_modes"):
-        df[col] = df[col].fillna("").map(lambda s: [x for x in str(s).split(";") if x])
-    df["failure_years"] = df["failure_years"].map(lambda xs: [int(x) for x in xs])
-    df["material_source"] = "register"
-    return df
+    """Backwards-compatible: the register as a DataFrame (only rows/columns provided)."""
+    recs = load_asset_overrides(path)
+    return pd.DataFrame([{"pipe": p, **r} for p, r in recs.items()])
+
+
+def load_facilities(path: str) -> dict[str, str]:
+    """Critical customers: CSV with columns `junction,type` (e.g. Hospital, School,
+    CareHome, IndustrialCustomer). Hospitals raise service criticality to Critical,
+    any other listed customer to at least High."""
+    df = pd.read_csv(path, dtype=str, keep_default_na=False)
+    if not {"junction", "type"} <= set(df.columns):
+        raise ValueError(f"{path}: needs columns 'junction' and 'type'")
+    return {r["junction"].strip(): r["type"].strip() for r in df.to_dict("records") if r["junction"].strip()}
 
 
 def load_failure_events(path: str) -> dict[str, list[tuple[int, str]]]:

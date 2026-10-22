@@ -122,13 +122,21 @@ def compute_risk_table(wn: wntr.network.WaterNetworkModel, assets: pd.DataFrame,
     return df, nodes
 
 
-def choose_critical_facilities(wn: wntr.network.WaterNetworkModel, cfg: Config) -> dict[str, str]:
+def choose_critical_facilities(wn: wntr.network.WaterNetworkModel, cfg: Config,
+                               known: dict[str, str] | None = None) -> dict[str, str]:
     """Critical consumers. Junctions with an industrial demand category in the model are
-    real evidence and become IndustrialCustomer; hospitals/schools/care homes are
-    synthetic and seeded (replace with GIS/customer data in practice)."""
+    real evidence and become IndustrialCustomer. If `known` (from a facilities CSV) is
+    given it is used as-is and nothing is invented; otherwise hospitals, schools and care
+    homes are synthetic and seeded."""
     from .physical import demand_by_category
     out = {n: "IndustrialCustomer" for n, j in wn.junctions()
            if demand_by_category(j).get("industrial", 0.0) > 0}
+    if known is not None:
+        unknown = sorted(set(known) - set(wn.junction_name_list))
+        if unknown:
+            raise ValueError(f"facilities CSV names junctions not in the model: {unknown[:5]}")
+        out.update(known)
+        return out
     rng = np.random.default_rng(cfg.seed + 7)
     cands = sorted(n for n, j in wn.junctions() if total_demand(j) > 0 and n not in out)
     k = min(cfg.n_critical_facilities, len(cands))

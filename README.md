@@ -88,14 +88,30 @@ This trains the ML baseline on the 2019 labels (out-of-fold) and reports capture
 
 **Web explorer** (`demo/index.html`, published by GitHub Pages). One self-contained page with the L-TOWN graph embedded: a pannable map coloured by risk, action, zone, monitoring or material; an Ask tab using the same keyword planner as Python; a Pipe tab showing each recommendation's audit trail from asset record to authorising clause; and a Policy sandbox where changing design lives, PoF bands, inspection intervals or rule R5 recomputes every decision live. The policy rules and planner are re-implemented in JavaScript, and `tests/test_web_parity.py` runs them in Node to check they reproduce the Python decisions and answers exactly. Links like `demo/#p257` open that pipe directly.
 
-**Bringing other networks to the explorer.** The page cannot run EPANET, so networks are built in Python or Colab and the page displays the result. Two ways:
+**Saving work.** The explorer's **Save…** menu writes four files, all generated in the browser:
 
-```bash
-python -m wateront web --inp mynet.inp --seed 7 --json --out mynet_seed7.json   # then "Open network…" on the hosted page
-python -m wateront web --inp mynet.inp --out demo/index.html                    # a complete page with the network inside
-```
+| File | Contents | Use it for |
+|---|---|---|
+| Network file (`.json`) | The whole network, your pipe edits (with their original values) and your policy settings | Reopening your work later with **Open network…** |
+| Decisions table (`.csv`) | Every pipe with its facts, risk bands, action, rule, reason and clauses, plus the action under the default policy | Excel, reports, comparing scenarios |
+| Asset register (`.csv`) | Asset facts in the format Python reads with `--assets` | Feeding browser edits back into a full Python rebuild |
+| Map picture (`.svg`) | The map as currently coloured, with its legend | Papers and slides |
 
-An opened file is read in the visitor's browser and never uploaded, so a utility can look at its own network on the public page without sharing any data.
+The Ask tab can also save a question's results as CSV, and the Pipe tab can save one pipe's audit trail as a Markdown report.
+
+**Editing pipes.** In the Pipe tab, **Edit asset record** changes install year, material, condition grade, last inspection, soil corrosivity and failure years. The failure probability and decision are recomputed at once with the same formulas as Python; `tests/test_web_parity.py` checks that browser edits, exported as an asset register and rebuilt in Python, give identical recommendations for every pipe. Hydraulic and service criticality come from network simulation and do not change in the browser. Edits stay in the page until saved in a network file, and the page warns before you leave with unsaved edits.
+
+**Your data.** The Data tab explains what comes from the `.inp` and what is synthetic, and imports an asset register CSV straight into the page. Any subset of columns can be given, blank cells keep their current value, `none` in `failure_years` means no recorded failures, and invalid values (unknown materials, grades outside 1 to 5) stop the import with line-by-line reasons. The same rules apply in Python. Data that change the hydraulics or the network need a rebuild in Python or Colab:
+
+| Data | Python option | Template |
+|---|---|---|
+| Network model | `--inp mynet.inp` | any EPANET 2 file; sensors can be marked in element comments as in L-TOWN |
+| Asset register | `--assets register.csv` | `data/asset_register_template.csv` |
+| Dated failures or leaks | `--failures failures.csv` | columns `pipe,date[,mode]` |
+| Critical customers | `--facilities facilities.csv` | `data/facilities_template.csv`; replaces the synthetic hospitals and schools |
+| Policy text | `--guidelines policy.json` | `data/guidelines_template.json` |
+
+Then `python -m wateront web --inp mynet.inp --assets register.csv --json --out mynet.json` and open the file with **Open network…**. An opened file is read in the visitor's browser and never uploaded, so a utility can view its own network on the public page without sharing any data. With real data, the main practical step is matching register IDs to model pipe IDs; registers often use GIS asset IDs that do not match EPANET link names.
 
 **Live app on Colab** (`demo/WaterOnt_Colab.ipynb`). Builds the graph, downloads the static page, and launches `wateront/gradio_app.py` with `share=True`, which gives a temporary public link to the real Python engine. Add `ANTHROPIC_API_KEY` in Colab Secrets to switch on Claude for planning and generation.
 

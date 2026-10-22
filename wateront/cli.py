@@ -22,6 +22,7 @@ def main(argv=None) -> None:
     b.add_argument("--assets", help="optional asset-register CSV (see asset.load_asset_table)")
     b.add_argument("--guidelines", help="optional guideline JSON (see decision.load_guidelines)")
     b.add_argument("--failures", help="observed failure CSV (pipe, year|date, [mode]); replaces synthetic history")
+    b.add_argument("--facilities", help="critical customers CSV (junction, type); replaces synthetic ones")
     b.add_argument("--sim-hours", type=float, help="simulation length (default: model duration, max 168 h)")
     b.add_argument("--out", default="kg.pkl")
     b.add_argument("--ttl", help="also export instance RDF (Turtle)")
@@ -50,7 +51,7 @@ def main(argv=None) -> None:
     w = sub.add_parser("web", help="Write the self-contained web demonstrator (one HTML file)")
     w.add_argument("--inp", default="Net3")
     w.add_argument("--out", default="demo/index.html")
-    w.add_argument("--assets"); w.add_argument("--failures")
+    w.add_argument("--assets"); w.add_argument("--failures"); w.add_argument("--facilities")
     w.add_argument("--seed", type=int, default=42)
     w.add_argument("--json", action="store_true", help="write a network file for the page's “Open network” button instead")
 
@@ -59,7 +60,7 @@ def main(argv=None) -> None:
     if args.cmd == "build":
         from .pipeline import build_knowledge_graph
         res = build_knowledge_graph(args.inp, Config(seed=args.seed, sim_duration_h=args.sim_hours),
-                                    args.assets, args.guidelines, args.failures)
+                                    args.assets, args.guidelines, args.failures, args.facilities)
         res.kg.save(args.out)
         print(f"saved {args.out}: {res.kg.stats()['nodes']} nodes, {res.kg.stats()['edges']} edges")
         if args.ttl:
@@ -75,7 +76,8 @@ def main(argv=None) -> None:
         from .pipeline import build_knowledge_graph
         from .web_export import write_web
         cfg = Config(seed=args.seed)
-        res = build_knowledge_graph(args.inp, cfg, args.assets, failures_csv=args.failures)
+        res = build_knowledge_graph(args.inp, cfg, args.assets, failures_csv=args.failures,
+                                    facilities_csv=args.facilities)
         if args.json:
             from .web_export import write_json
             out = args.out if args.out.endswith(".json") else f"{res.network_id}_seed{args.seed}.json"

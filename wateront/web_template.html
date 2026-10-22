@@ -59,6 +59,36 @@ header.bar {
 .bar select { background: var(--bg); border: 1px solid var(--line); border-radius: 6px; padding: 5px 8px; }
 
 #loadStatus { flex-basis: 100%; font-size: 13px; color: var(--ink-2); }
+details.menu { position: relative; }
+details.menu > summary { list-style: none; display: inline-block; }
+details.menu > summary::-webkit-details-marker { display: none; }
+.menu-list {
+  position: absolute; right: 0; top: calc(100% + 6px); z-index: 20; width: 300px; background: var(--surface);
+  border: 1px solid var(--line); border-radius: 10px; padding: 6px; box-shadow: 0 8px 24px rgba(15,26,32,.18);
+}
+.menu-list button { display: grid; gap: 1px; width: 100%; text-align: left; background: none; border: 0; border-radius: 7px; padding: 8px 10px; cursor: pointer; }
+.menu-list button:hover, .menu-list button:focus-visible { background: var(--surface-2); }
+.menu-list span { font-size: 12.5px; color: var(--ink-2); }
+.pane h3 { font-size: 15px; margin: 20px 0 4px; }
+.pane p { font-size: 14px; margin: 0 0 10px; }
+.pane code { font-size: 12.5px; background: var(--surface-2); padding: 0 4px; border-radius: 3px; }
+table.src { width: 100%; border-collapse: collapse; font-size: 13.5px; }
+table.src th { text-align: left; font-weight: 600; width: 38%; padding: 6px 8px 6px 0; vertical-align: top; }
+table.src td { padding: 6px 0; vertical-align: top; color: var(--ink-2); }
+table.src tr + tr { border-top: 1px solid var(--line); }
+.btnrow { display: flex; flex-wrap: wrap; gap: 8px; margin: 8px 0; }
+.msg { font-size: 13.5px; border-radius: 8px; padding: 8px 10px; margin: 8px 0; background: var(--surface-2); }
+.msg.error { color: var(--r-int); }
+.msg ul { margin: 4px 0 0; padding-left: 18px; }
+dl.cmds { grid-template-columns: auto 1fr; margin-bottom: 10px; }
+.tools { display: flex; flex-wrap: wrap; gap: 8px; margin: 0 0 14px; }
+.badge { font-size: 12px; font-weight: 600; padding: 1px 7px; border-radius: 4px; background: var(--accent); color: var(--accent-ink); }
+form.edit { display: grid; grid-template-columns: 1fr 1fr; gap: 8px 12px; background: var(--bg); border: 1px solid var(--line); border-radius: 8px; padding: 12px; margin: 0 0 14px; font-size: 14px; }
+form.edit label { display: grid; gap: 3px; color: var(--ink-2); }
+form.edit input, form.edit select { padding: 6px 8px; border: 1px solid var(--line); border-radius: 6px; background: var(--surface); color: var(--ink); }
+form.edit .wide { grid-column: 1 / -1; }
+form.edit .hint { font-size: 12.5px; color: var(--ink-2); }
+.dl { background: none; border: 0; color: var(--accent); text-decoration: underline; cursor: pointer; padding: 0; font-size: 13.5px; }
 #loadStatus:empty { display: none; }
 body.dropping .mapwrap { outline: 3px dashed var(--accent); outline-offset: -8px; }
 .mapwrap { position: relative; min-height: 0; overflow: hidden; touch-action: none; }
@@ -88,7 +118,7 @@ svg#map .dimmed { opacity: var(--dim); }
 aside.panel { border-left: 1px solid var(--line); background: var(--surface); display: flex; flex-direction: column; min-height: 0; }
 .tabs { display: flex; border-bottom: 1px solid var(--line); }
 .tabs button {
-  flex: 1; padding: 11px 6px; background: none; border: 0; border-bottom: 3px solid transparent; cursor: pointer;
+  flex: 1; padding: 11px 4px; background: none; border: 0; border-bottom: 3px solid transparent; cursor: pointer;
   font-weight: 600; color: var(--ink-2);
 }
 .tabs button[aria-selected="true"] { color: var(--ink); border-bottom-color: var(--accent); }
@@ -194,6 +224,15 @@ footer.note { font-size: 12.5px; color: var(--ink-2); padding: 12px 20px; border
     </label>
     <label><input type="checkbox" id="showSensors" checked> Show sensors</label>
     <button class="btn quiet" id="openBtn" type="button" title="Open a network exported from Python or Colab. The file stays on your computer.">Open network…</button>
+    <details class="menu" id="saveMenu">
+      <summary class="btn quiet">Save…</summary>
+      <div class="menu-list" role="menu">
+        <button type="button" role="menuitem" data-save="network"><b>Network file</b><span>Everything, including your edits and policy. Reopen it here later.</span></button>
+        <button type="button" role="menuitem" data-save="decisions"><b>Decisions table (.csv)</b><span>Every pipe with its risk, recommended action, rule and clauses. Opens in Excel.</span></button>
+        <button type="button" role="menuitem" data-save="register"><b>Asset register (.csv)</b><span>Asset facts in the format Python reads with <code>--assets</code>.</span></button>
+        <button type="button" role="menuitem" data-save="svg"><b>Map picture (.svg)</b><span>The map as shown now, with its legend, for papers and slides.</span></button>
+      </div>
+    </details>
     <input type="file" id="openFile" accept=".json,application/json" hidden>
     <span id="loadStatus" role="status" aria-live="polite"></span>
   </header>
@@ -216,6 +255,7 @@ footer.note { font-size: 12.5px; color: var(--ink-2); padding: 12px 20px; border
       <button role="tab" id="tab-ask" aria-selected="true" aria-controls="pane-ask">Ask</button>
       <button role="tab" id="tab-pipe" aria-selected="false" aria-controls="pane-pipe">Pipe</button>
       <button role="tab" id="tab-policy" aria-selected="false" aria-controls="pane-policy">Policy</button>
+      <button role="tab" id="tab-data" aria-selected="false" aria-controls="pane-data">Data</button>
     </div>
 
     <section class="pane" id="pane-ask" role="tabpanel">
@@ -260,6 +300,33 @@ footer.note { font-size: 12.5px; color: var(--ink-2); padding: 12px 20px; border
         <label class="check"><input type="checkbox" id="r5"> Inspect critical, high-risk mains with no pressure sensor within two segments (rule R5)</label>
       </fieldset>
       <button class="btn quiet" id="resetPolicy" type="button">Restore default policy</button>
+    </section>
+    <section class="pane" id="pane-data" role="tabpanel" hidden>
+      <h2>Where the data come from</h2>
+      <p class="lead" id="dataSummary"></p>
+      <table class="src">
+        <tr><th>From the EPANET model (.inp)</th><td>Layout, lengths and diameters; simulated pressures and flows; hydraulic criticality; supply zones; sensors marked in the file; customer demand types.</td></tr>
+        <tr><th>Synthetic unless you supply them</th><td>Install year, material, condition grade, last inspection, failure history, soil, and hospitals, schools or care homes.</td></tr>
+      </table>
+      <h3>Update asset records here</h3>
+      <p>Import an asset register to replace synthetic facts with real ones. Only the columns and cells you fill in are used; blank cells keep the current value. Write <code>none</code> in <code>failure_years</code> for a pipe with no recorded failures. The file stays in your browser.</p>
+      <div class="btnrow">
+        <button class="btn" id="importBtn" type="button">Import asset register…</button>
+        <button class="btn quiet" id="templateBtn" type="button">Download a template</button>
+        <input type="file" id="importFile" accept=".csv,text/csv" hidden>
+      </div>
+      <div id="importStatus" role="status" aria-live="polite"></div>
+      <div id="editsList"></div>
+      <h3>Rebuild with Python or Colab</h3>
+      <p>Some data change the hydraulics or the network itself, so they need a rebuild:</p>
+      <dl class="facts cmds">
+        <dt>A new network</dt><dd><code>--inp mynet.inp</code></dd>
+        <dt>Asset register</dt><dd><code>--assets register.csv</code></dd>
+        <dt>Dated failures</dt><dd><code>--failures failures.csv</code></dd>
+        <dt>Critical customers</dt><dd><code>--facilities facilities.csv</code></dd>
+        <dt>Your policy text</dt><dd><code>--guidelines policy.json</code></dd>
+      </dl>
+      <p>Then <code>python -m wateront web --json --out mynet.json …</code> and open the file here with <b>Open network…</b>. An asset register saved from this page can go straight back into <code>--assets</code>.</p>
     </section>
     <footer class="note" id="footnote"></footer>
   </aside>
@@ -370,6 +437,95 @@ function retrieve(plan, pipes, decisions, data) {
                      || (a.pipe.id < b.pipe.id ? -1 : 1));
   return out.slice(0, plan.topK);
 }
+// --- asset edits: mirrors asset.py/risk.py so edited pipes get the same PoF as a Python rebuild
+function pofKmOf(p, cfg) {
+  const [beta, eta] = cfg.weibull[p.mat];
+  const H = t => Math.pow(t / eta, beta);
+  const dH = H(p.age + cfg.horizon) - H(p.age);
+  const mult = Math.exp(cfg.failureCoef * p.fails) * cfg.soilFactor[p.soil];
+  return 1 - Math.exp(-dH * cfg.hazardScale * mult);
+}
+const EDIT_FIELDS = ["age", "mat", "grade", "insp", "fails", "failYears", "failModes", "soil", "msrc", "pofKm", "pof"];
+function applyEdit(p, e, cfg) {
+  // e: any of {installYear, mat, grade, insp, failYears, soil}; returns a new pipe object
+  const q = { ...p };
+  if (e.installYear !== undefined) q.age = cfg.referenceYear - e.installYear;
+  if (e.mat !== undefined && e.mat !== p.mat) { q.mat = e.mat; q.msrc = "edited"; }
+  if (e.grade !== undefined) q.grade = e.grade;
+  if (e.soil !== undefined) q.soil = e.soil;
+  if (e.insp !== undefined) q.insp = e.insp;
+  if (e.failYears !== undefined) {
+    q.failYears = e.failYears.slice().sort((a, b) => a - b);
+    const keep = p.failModes.slice(0, q.failYears.length);
+    q.failModes = keep.concat(Array(q.failYears.length - keep.length).fill("Burst"));
+    q.fails = q.failYears.length;
+  }
+  const installed = cfg.referenceYear - q.age;
+  if (q.insp < installed) q.insp = installed;
+  q.pofKm = pofKmOf(q, cfg);
+  q.pof = 1 - Math.pow(1 - q.pofKm, Math.max(q.len / 1000, 0.05));
+  return q;
+}
+const REGISTER_COLS = ["pipe", "install_year", "material", "soil_corrosivity", "condition_grade",
+                       "last_inspection_year", "failure_years", "failure_modes"];
+const csvCell = v => /[",\n]/.test(String(v)) ? `"${String(v).replace(/"/g, '""')}"` : String(v);
+function toCsv(rows) { return rows.map(r => r.map(csvCell).join(",")).join("\n") + "\n"; }
+function toRegisterCsv(pipes, cfg) {
+  return toCsv([REGISTER_COLS, ...pipes.map(p => [p.id, cfg.referenceYear - p.age, p.mat, p.soil, p.grade, p.insp,
+    p.failYears.length ? p.failYears.join(";") : "none", p.failModes.join(";")])]);
+}
+function parseCsv(text) {
+  const rows = []; let row = [], cell = "", q = false;
+  for (let i = 0; i < text.length; i++) {
+    const c = text[i];
+    if (q) { if (c === '"' && text[i + 1] === '"') { cell += '"'; i++; } else if (c === '"') q = false; else cell += c; }
+    else if (c === '"') q = true;
+    else if (c === ",") { row.push(cell); cell = ""; }
+    else if (c === "\n" || c === "\r") { if (c === "\r" && text[i + 1] === "\n") i++; row.push(cell); rows.push(row); row = []; cell = ""; }
+    else cell += c;
+  }
+  if (cell !== "" || row.length) { row.push(cell); rows.push(row); }
+  return rows.filter(r => r.some(x => x.trim() !== ""));
+}
+function parseRegister(text, pipeIds, cfg) {
+  // Same rules as asset.load_asset_overrides: blank keeps, 'none' clears failures, all-or-nothing.
+  const rows = parseCsv(text);
+  if (!rows.length) return { errors: ["the file is empty"], edits: {}, unknown: [] };
+  const head = rows[0].map(h => h.trim());
+  if (!head.includes("pipe")) return { errors: ["the first row must contain a 'pipe' column"], edits: {}, unknown: [] };
+  const col = n => head.indexOf(n), errors = [], edits = {}, unknown = [];
+  const known = new Set(pipeIds), mats = Object.keys(cfg.weibull), soils = Object.keys(cfg.soilFactor);
+  rows.slice(1).forEach((r, k) => {
+    const line = k + 2, get = n => (col(n) >= 0 ? (r[col(n)] || "").trim() : "");
+    const id = get("pipe");
+    if (!id) return;
+    if (!known.has(id)) { unknown.push(id); return; }
+    const e = {}, num = (n, key, lo, hi) => {
+      const v = get(n);
+      if (!v) return;
+      const x = Number(v);
+      if (!Number.isFinite(x)) errors.push(`line ${line}, ${n}: “${v}” is not a number`);
+      else if (x < lo || x > hi) errors.push(`line ${line}, ${n}: ${v} is outside ${lo}–${hi}`);
+      else e[key] = Math.trunc(x);
+    };
+    num("install_year", "installYear", 1800, cfg.referenceYear);
+    num("condition_grade", "grade", 1, 5);
+    num("last_inspection_year", "insp", 1800, cfg.referenceYear);
+    const m = get("material"); if (m) { if (mats.includes(m)) e.mat = m; else errors.push(`line ${line}, material: “${m}” is not one of ${mats.join(", ")}`); }
+    const so = get("soil_corrosivity"); if (so) { if (soils.includes(so)) e.soil = so; else errors.push(`line ${line}, soil_corrosivity: use ${soils.join(", ")}`); }
+    const fy = get("failure_years");
+    if (fy) {
+      if (/^(none|0)$/i.test(fy)) e.failYears = [];
+      else {
+        const ys = fy.split(";").map(x => x.trim()).filter(Boolean).map(Number);
+        if (ys.some(y => !Number.isFinite(y))) errors.push(`line ${line}, failure_years: use years separated by “;”, or “none”`);
+        else e.failYears = ys.map(Math.trunc);
+      }
+    }
+    edits[id] = e;
+  });
+  return { errors, edits, unknown };
+}
 // LOGIC END
 
 function openNetwork(D, label) {
@@ -384,6 +540,7 @@ function openNetwork(D, label) {
 async function loadFile(file) {
   const st = document.getElementById("loadStatus");
   try {
+    if (window.__woDirty && window.__woDirty() && !confirm("Opening another network discards your unsaved edits. Continue?")) return;
     if (/\.inp$/i.test(file.name))
       throw new Error("this is an EPANET model; build it first in Python or Colab (python -m wateront web --inp your.inp --json) and open the .json here");
     openNetwork(JSON.parse(await file.text()), `Opened ${file.name}. The file was read in your browser and not uploaded anywhere.`);
@@ -410,15 +567,22 @@ function main(D) {
   const esc = s => String(s).replace(/[&<>"]/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]));
   const glById = Object.fromEntries(D.guidelines.map(g => [g.id, g]));
   const pipeIndex = Object.fromEntries(D.pipes.map((p, i) => [p.id, i]));
-  let policy = defaultPolicy(D.config);
+  // originals of edited pipes (restored from a saved network file if present)
+  const originals = {};
+  for (const e of D.edited || []) originals[e.id] = e.original;
+  let policy = D.policy ? { ...defaultPolicy(D.config), ...D.policy } : defaultPolicy(D.config);
   const basePolicy = defaultPolicy(D.config);
-  const baseline = D.pipes.map(p => decide(p, basePolicy));
+  let baseline = D.pipes.map(p => decide(p, basePolicy));
   let decisions = baseline.slice();
-  let highlight = null, selected = null;
+  let highlight = null, selected = null, editing = false, dirty = false;
+  const isEdited = id => id in originals;
+  const origOf = p => (isEdited(p.id) ? { ...p, ...originals[p.id] } : p);
+  window.onbeforeunload = () => (dirty ? "You have edits that are not saved." : undefined);
+  window.__woDirty = () => dirty;
 
   $("netlabel").textContent = `${D.network}: ${D.pipes.length} pipes, ${D.graph.nodes.toLocaleString()} graph nodes`;
-  $("footnote").textContent = `Network, sensors and demands from the ${D.network} model; asset records synthetic ` +
-    `(seed ${D.config.seed}); policy clauses paraphrased for demonstration.` + (D.notice && /EUPL/.test(D.notice) ? ` ${D.notice.replace(/\.$/, "")}.` : "");
+  $("footnote").textContent = `Asset records synthetic (seed ${D.config.seed}); policy clauses paraphrased.` +
+    (D.notice && /EUPL/.test(D.notice) ? ` Network © KIOS, EUPL-1.2.` : "");
 
   // ---------------------------------------------------------------- map geometry
   const xs = D.nodes.map(n => n[1]), ys = D.nodes.map(n => n[2]);
@@ -586,12 +750,12 @@ function main(D) {
 
   // ------------------------------------------------------------------------ tabs
   function showTab(name) {
-    for (const t of ["ask", "pipe", "policy"]) {
+    for (const t of ["ask", "pipe", "policy", "data"]) {
       $("tab-" + t).setAttribute("aria-selected", String(t === name));
       $("pane-" + t).hidden = t !== name;
     }
   }
-  for (const t of ["ask", "pipe", "policy"]) $("tab-" + t).onclick = () => showTab(t);
+  for (const t of ["ask", "pipe", "policy", "data"]) $("tab-" + t).onclick = () => showTab(t);
 
   // --------------------------------------------------------------------- explain
   function why(p, d) {
@@ -612,9 +776,35 @@ function main(D) {
     location.hash = p.id;
     const changed = d.action !== b.action
       ? `<div class="changed">Your policy changes this pipe from <b>${b.action}</b> (default) to <b>${d.action}</b>.</div>` : "";
+    let editedNote = "";
+    if (isEdited(p.id)) {
+      const o = origOf(p), od = decide(o, policy), diffs = [];
+      if (o.age !== p.age) diffs.push(`installed ${policy.referenceYear - o.age} → ${policy.referenceYear - p.age}`);
+      if (o.mat !== p.mat) diffs.push(`material ${MAT_NAMES[o.mat]} → ${MAT_NAMES[p.mat]}`);
+      if (o.grade !== p.grade) diffs.push(`grade ${o.grade} → ${p.grade}`);
+      if (o.insp !== p.insp) diffs.push(`last inspected ${o.insp} → ${p.insp}`);
+      if (o.fails !== p.fails) diffs.push(`failures ${o.fails} → ${p.fails}`);
+      if (o.soil !== p.soil) diffs.push(`soil ${o.soil} → ${p.soil}`);
+      editedNote = `<div class="changed"><span class="badge">Edited</span> ${esc(diffs.join("; ") || "no net change")}. ` +
+        (od.action !== d.action ? `Recommendation changed from <b>${od.action}</b> to <b>${d.action}</b>.` : `Recommendation unchanged.`) + `</div>`;
+    }
+    const tools = `<div class="tools">
+        <button class="btn quiet" type="button" id="editBtn">${editing ? "Cancel editing" : "Edit asset record"}</button>
+        ${isEdited(p.id) ? `<button class="btn quiet" type="button" id="revertBtn">Revert edits</button>` : ""}
+        <button class="dl" type="button" id="trailBtn">Download audit trail</button></div>`;
+    const form = editing ? `<form class="edit" id="editForm">
+        <label>Install year<input name="installYear" type="number" min="1800" max="${policy.referenceYear}" value="${policy.referenceYear - p.age}" required></label>
+        <label>Material<select name="mat">${Object.keys(D.config.weibull).map(m => `<option value="${m}"${m === p.mat ? " selected" : ""}>${MAT_NAMES[m] || m}</option>`).join("")}</select></label>
+        <label>Condition grade<select name="grade">${[1, 2, 3, 4, 5].map(g => `<option${g === p.grade ? " selected" : ""}>${g}</option>`).join("")}</select></label>
+        <label>Last inspected<input name="insp" type="number" min="1800" max="${policy.referenceYear}" value="${p.insp}" required></label>
+        <label>Soil corrosivity<select name="soil">${Object.keys(D.config.soilFactor).map(x => `<option${x === p.soil ? " selected" : ""}>${x}</option>`).join("")}</select></label>
+        <label class="wide">Failure years, separated by “;”<input name="failYears" type="text" value="${p.failYears.join("; ")}" placeholder="none"></label>
+        <span class="hint wide">Hydraulic and service criticality come from the network model and are not affected by these facts.</span>
+        <div class="wide"><button class="btn" type="submit">Apply</button> <span id="editErr" class="flag"></span></div>
+      </form>` : "";
     const lifeFlag = p.age > d.life ? ` <span class="flag">beyond design life</span>` : "";
     const sensors = p.sensors.length ? p.sensors.join(", ") : "none on this pipe";
-    $("pipeDetail").innerHTML = `${changed}
+    $("pipeDetail").innerHTML = `${editedNote}${changed}${tools}${form}
       <ol class="trail">
         <li><span class="node">Pipe ${esc(p.id)}</span>
           <dl class="facts"><dt>Length</dt><dd>${p.len.toLocaleString()} m</dd><dt>Diameter</dt><dd>${p.dia} mm</dd>
@@ -638,8 +828,53 @@ function main(D) {
           ${d.guidelines.map(g => `<div class="gl"><b>${g}: ${esc(glById[g].title)}</b><span style="color:var(--ink-2)">${esc(glById[g].framework)}</span><br>${esc(glById[g].text)}</div>`).join("")}</li>
       </ol>`;
     $("findId").value = p.id;
+    $("editBtn").onclick = () => { editing = !editing; selectPipe(i); };
+    if ($("revertBtn")) $("revertBtn").onclick = () => { D.pipes[i] = origOf(p); delete originals[p.id]; dirty = true; editing = false; afterEdit(); };
+    $("trailBtn").onclick = () => download(`${p.id}_audit_trail.md`, trailMarkdown(i), "text/markdown");
+    if (editing) $("editForm").onsubmit = ev => {
+      ev.preventDefault();
+      const f = new FormData(ev.target), yr = +f.get("installYear"), insp = +f.get("insp");
+      const raw = String(f.get("failYears")).trim();
+      const ys = /^(none|0)?$/i.test(raw) ? [] : raw.split(";").map(x => x.trim()).filter(Boolean).map(Number);
+      const err = !Number.isInteger(yr) || yr < 1800 || yr > policy.referenceYear ? "Install year must be a year up to " + policy.referenceYear + "."
+        : insp < yr ? "Last inspection cannot be before installation."
+        : ys.some(y => !Number.isInteger(y) || y < yr || y > policy.referenceYear) ? `Failure years must be whole years between ${yr} and ${policy.referenceYear}.` : "";
+      if (err) { $("editErr").textContent = err; return; }
+      editPipe(i, { installYear: yr, mat: f.get("mat"), grade: +f.get("grade"), insp, soil: f.get("soil"), failYears: ys });
+      editing = false; afterEdit();
+    };
     drawSelection();
     if (fromMap) showTab("pipe");
+  }
+  function editPipe(i, e) {
+    const p = D.pipes[i];
+    if (!isEdited(p.id)) originals[p.id] = Object.fromEntries(EDIT_FIELDS.map(k => [k, p[k]]));
+    D.pipes[i] = applyEdit(p, e, { ...D.config, referenceYear: policy.referenceYear });
+    dirty = true;
+  }
+  function afterEdit() {
+    baseline = D.pipes.map(p => decide(p, basePolicy));
+    recompute();
+    renderEdits();
+  }
+  function trailMarkdown(i) {
+    const p = D.pipes[i], d = decisions[i];
+    const lines = [`# Audit trail: pipe ${p.id} (${D.network})`, "",
+      `Recommended action: **${d.action}** (rule ${d.rule}): ${why(p, d)}.`, "",
+      "## Pipe", `- Length ${p.len} m, diameter ${p.dia} mm, zone fed by ${p.zone || "none"}`, "",
+      "## Asset record" + (isEdited(p.id) ? " (edited in the explorer)" : ""),
+      `- Material: ${MAT_NAMES[p.mat]} (${p.msrc})`, `- Installed ${policy.referenceYear - p.age}, age ${p.age} years; design life ${d.life} years`,
+      `- Condition grade ${p.grade} of 5; failures: ${p.failYears.join(", ") || "none"}; last inspected ${p.insp}${d.overdue ? " (overdue)" : ""}`, "",
+      "## Risk profile", `- Failure probability ${(p.pofKm * 100).toFixed(1)}% per km over ${D.config.horizon} years (${d.pofBand})`,
+      `- Hydraulic criticality ${p.hyd}; service criticality ${p.svc}${p.fac.length ? ` (serves ${p.fac.join(", ")})` : ""}`,
+      `- Pressure monitoring: ${p.mon === false ? "no sensor within two segments" : "sensor within two segments"}`,
+      `- Overall risk **${d.overall}** (likelihood ${d.pLevel} × consequence ${d.cLevel})`, "",
+      "## Authorising clauses", ...d.guidelines.map(g => `- **${g}** ${glById[g].title} (${glById[g].framework}): ${glById[g].text}`), "",
+      "## Policy in force", `- PoF band limits per km: ${policy.pofBands.join(", ")}`,
+      `- Design life: ${Object.entries(policy.designLife).map(([m, v]) => `${m} ${v}`).join(", ")}`,
+      `- Inspection intervals: ${Object.entries(policy.inspectionInterval).map(([r, v]) => `${r} ${v}`).join(", ")}; rule R5 ${policy.r5 ? "on" : "off"}`, "",
+      `_${D.notice || ""} Generated by the WaterOnt explorer on ${new Date().toISOString().slice(0, 10)}._`];
+    return lines.join("\n") + "\n";
   }
   $("findForm").onsubmit = e => {
     e.preventDefault();
@@ -695,7 +930,11 @@ function main(D) {
          <span class="why">${esc(why(p, d))}.</span></button>
        <div class="cites">Authorised by ${glChips(d.guidelines)}</div></li>`).join("")}</ol>`
       : `<p class="empty">No pipe satisfies all of these conditions under the current policy. Remove a condition, or loosen the policy in the Policy tab.</p>`;
-    $("answer").innerHTML = understood + list;
+    const dl = res.length ? `<p style="margin-top:10px"><button class="dl" type="button" id="resultsBtn">Download these results (.csv)</button></p>` : "";
+    $("answer").innerHTML = understood + list + dl;
+    if (res.length) $("resultsBtn").onclick = () => download(`${D.network}_question_results.csv`,
+      toCsv([["question", q], [], ["rank", "pipe", "action", "rule", "reason", "clauses"],
+             ...res.map(({ pipe: p, d }, k) => [k + 1, p.id, d.action, d.rule, why(p, d), d.guidelines.join(";")])]), "text/csv");
     $("answer").querySelectorAll("button.rhead").forEach(b => b.onclick = () => { selectPipe(+b.dataset.i); showTab("pipe"); });
     $("examples").hidden = true; $("moreEx").hidden = false;
   }
@@ -754,11 +993,102 @@ function main(D) {
   $("r5").onchange = () => { policy.r5 = $("r5").checked; recompute(); };
   $("resetPolicy").onclick = () => { policy = defaultPolicy(D.config); syncInputs(); recompute(); };
 
+  // ------------------------------------------------------------------- downloads
+  function download(name, text, type) {
+    const url = URL.createObjectURL(new Blob([text], { type: type + ";charset=utf-8" }));
+    const a = document.createElement("a");
+    a.href = url; a.download = name; document.body.appendChild(a); a.click(); a.remove();
+    setTimeout(() => URL.revokeObjectURL(url), 1000);
+  }
+  const stamp = () => new Date().toISOString().slice(0, 10);
+  function decisionsCsv() {
+    return toCsv([["pipe", "zone", "length_m", "diameter_mm", "material", "material_source", "install_year", "age", "design_life",
+      "condition_grade", "failures", "last_inspection", "pof_per_km", "pof_band", "hydraulic_criticality", "service_criticality",
+      "critical_customers", "pressure_sensor_nearby", "min_pressure_m", "overall_risk", "action", "rule", "reason", "clauses",
+      "action_under_default_policy", "edited"],
+      ...D.pipes.map((p, i) => { const d = decisions[i]; return [p.id, p.zone || "", p.len, p.dia, p.mat, p.msrc,
+        policy.referenceYear - p.age, p.age, d.life, p.grade, p.fails, p.insp, p.pofKm.toFixed(4), d.pofBand, p.hyd, p.svc,
+        p.fac.join(";"), p.mon === false ? "no" : "yes", p.minP >= 9999 ? "" : p.minP, d.overall, d.action, d.rule, why(p, d),
+        d.guidelines.join(";"), baseline[i].action, isEdited(p.id) ? "yes" : "no"]; })]);
+  }
+  function svgPicture() {
+    const r = svg.getBoundingClientRect(), Wpx = 1600, Hpx = Math.round(Wpx * r.height / r.width), legendH = 34;
+    const inner = svg.cloneNode(true);
+    inner.removeAttribute("id"); inner.removeAttribute("class");
+    inner.setAttribute("x", 0); inner.setAttribute("y", 0); inner.setAttribute("width", Wpx); inner.setAttribute("height", Hpx);
+    inner.querySelectorAll("line").forEach(l => {
+      l.setAttribute("stroke-linecap", "round"); l.setAttribute("vector-effect", "non-scaling-stroke");
+      if (l.classList.contains("dimmed")) l.setAttribute("opacity", "0.18");
+      l.removeAttribute("class");
+    });
+    const sc = SCALES[$("colorBy").value];
+    let x = 16, legend = "";
+    for (const [k, v] of sc.keys) {
+      const label = $("colorBy").value === "mat" ? MAT_NAMES[k] : k;
+      legend += `<rect x="${x}" y="${Hpx + 14}" width="22" height="6" rx="3" fill="${css(v)}"/><text x="${x + 28}" y="${Hpx + 21}">${esc(label)}</text>`;
+      x += 40 + label.length * 8;
+    }
+    return `<svg xmlns="http://www.w3.org/2000/svg" width="${Wpx}" height="${Hpx + legendH}" viewBox="0 0 ${Wpx} ${Hpx + legendH}" font-family="Public Sans, Arial, sans-serif" font-size="13" fill="${css("--ink")}">
+<rect width="100%" height="100%" fill="${css("--bg")}"/>${inner.outerHTML}
+<text x="${Wpx - 16}" y="${Hpx + 21}" text-anchor="end" fill="${css("--ink-2")}">${esc(D.network)}: ${esc(sc.label.toLowerCase())}</text>${legend}</svg>`;
+  }
+  for (const b of document.querySelectorAll("[data-save]")) b.onclick = () => {
+    $("saveMenu").open = false;
+    const kind = b.dataset.save, base = `${D.network}_seed${D.config.seed}`;
+    if (kind === "network") {
+      const out = { ...D, policy, edited: Object.entries(originals).map(([id, original]) => ({ id, original })), savedOn: stamp() };
+      download(`${base}${Object.keys(originals).length ? "_edited" : ""}.json`, JSON.stringify(out), "application/json");
+      dirty = false;
+    }
+    if (kind === "decisions") download(`${base}_decisions.csv`, decisionsCsv(), "text/csv");
+    if (kind === "register") download(`${base}_asset_register.csv`, toRegisterCsv(D.pipes, { ...D.config, referenceYear: policy.referenceYear }), "text/csv");
+    if (kind === "svg") download(`${base}_map_${$("colorBy").value}.svg`, svgPicture(), "image/svg+xml");
+  };
+  on(document, "click", e => { if (!$("saveMenu").contains(e.target)) $("saveMenu").open = false; });
+  on(document, "keydown", e => { if (e.key === "Escape") $("saveMenu").open = false; });
+
+  // ---------------------------------------------------------------------- data tab
+  const nEditedFromFile = Object.keys(originals).length;
+  $("dataSummary").textContent = `${D.network}: ${D.pipes.length} pipes, ${D.nodes.length} nodes, ${D.zones.length} supply zone(s). ` +
+    `Asset records generated with seed ${D.config.seed}` + (nEditedFromFile ? `; this file includes ${nEditedFromFile} edited pipe(s).` : ".") +
+    (D.notice ? ` ${D.notice.replace(/\.$/, "")}.` : "");
+  function renderEdits() {
+    const ids = Object.keys(originals);
+    $("editsList").innerHTML = ids.length ? `<div class="msg">${ids.length} pipe(s) edited: ${ids.slice(0, 12).map(id =>
+      `<button class="chip" type="button" data-goto="${esc(id)}">${esc(id)}</button>`).join("")}${ids.length > 12 ? " …" : ""}
+      <p style="margin:6px 0 0">Edits live in this page until you choose <b>Save… → Network file</b>.
+      <button class="dl" type="button" id="revertAll">Revert all edits</button></p></div>` : "";
+    $("editsList").querySelectorAll("[data-goto]").forEach(b => b.onclick = () => { selectPipe(pipeIndex[b.dataset.goto]); showTab("pipe"); });
+    if (ids.length) $("revertAll").onclick = () => {
+      for (const id of ids) { D.pipes[pipeIndex[id]] = origOf(D.pipes[pipeIndex[id]]); delete originals[id]; }
+      dirty = true; afterEdit(); $("importStatus").innerHTML = "";
+    };
+  }
+  $("importBtn").onclick = () => $("importFile").click();
+  $("templateBtn").onclick = () => download("asset_register_template.csv",
+    toCsv([REGISTER_COLS, [D.pipes[0].id, 1962, "CI", "Medium", 4, 2019, "2011;2020", "Burst;JointFailure"],
+           [D.pipes[1 % D.pipes.length].id, "", "", "", 2, "", "none", ""]]), "text/csv");
+  $("importFile").onchange = async e => {
+    const file = e.target.files[0]; e.target.value = "";
+    if (!file) return;
+    const res = parseRegister(await file.text(), D.pipes.map(p => p.id), { ...D.config, referenceYear: policy.referenceYear });
+    if (res.errors.length) {
+      $("importStatus").innerHTML = `<div class="msg error">Nothing was imported from ${esc(file.name)}. Fix these and try again:<ul>${
+        res.errors.slice(0, 8).map(x => `<li>${esc(x)}</li>`).join("")}${res.errors.length > 8 ? `<li>and ${res.errors.length - 8} more</li>` : ""}</ul></div>`;
+      return;
+    }
+    let n = 0;
+    for (const [id, edit] of Object.entries(res.edits)) if (Object.keys(edit).length) { editPipe(pipeIndex[id], edit); n++; }
+    afterEdit();
+    $("importStatus").innerHTML = `<div class="msg">Updated ${n} pipe(s) from ${esc(file.name)}.` +
+      (res.unknown.length ? ` Skipped ${res.unknown.length} row(s) for pipes not in ${esc(D.network)}, e.g. ${res.unknown.slice(0, 3).map(esc).join(", ")}.` : "") + `</div>`;
+  };
+
   $("colorBy").onchange = paint;
   $("showSensors").onchange = () => { drawMarkers(); paint(); };
   on(window.matchMedia("(prefers-color-scheme: dark)"), "change", () => { drawMarkers(); paint(); drawSelection(); });
 
-  syncInputs(); drawMarkers(); recompute();
+  syncInputs(); drawMarkers(); recompute(); renderEdits(); $("importStatus").innerHTML = "";
   const h = decodeURIComponent(location.hash.slice(1));
   if (h in pipeIndex) { selectPipe(pipeIndex[h]); showTab("pipe"); }
 }
