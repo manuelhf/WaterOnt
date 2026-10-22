@@ -134,3 +134,58 @@ def test_partial_register_keeps_blank_cells(tmp_path):
     bad.write_text("pipe,material,condition_grade\n101,Wood,9\n")
     with pytest.raises(ValueError, match="Wood.*condition_grade|condition_grade.*Wood|material"):
         build_knowledge_graph("Net3", asset_csv=str(bad), verbose=False)
+
+
+def run_js_sensors(payload, add, remove, tmp_path):
+    tpl = open(os.path.join(ROOT, "wateront", "web_template.html"), encoding="utf-8").read()
+    logic = re.search(r"// LOGIC START[^\n]*\n(.*?)// LOGIC END", tpl, re.S).group(1)
+    (tmp_path / "data.json").write_text(json.dumps(payload))
+    (tmp_path / "chg.json").write_text(json.dumps({"add": add, "remove": remove}))
+    script = logic + """
+const fs = require('fs');
+const D = JSON.parse(fs.readFileSync(process.argv[2], 'utf8'));
+const chg = JSON.parse(fs.readFileSync(process.argv[3], 'utf8'));
+const monOk = monitoringOf(D).every((m, i) => m === D.pipes[i].mon);
+for (const nd of D.nodes) {
+  if (chg.remove.includes(nd[0])) nd[4] = nd[4].filter(c => c !== 'PressureSensor');
+  if (chg.add.includes(nd[0]) && !nd[4].includes('PressureSensor')) nd[4].push('PressureSensor');
+}
+const m = monitoringOf(D);
+D.pipes.forEach((p, i) => { p.mon = m[i]; });
+const pol = defaultPolicy(D.config);
+const csv = sensorCsv(D);
+console.log(JSON.stringify({monOk, csv, mon: m, actions: D.pipes.map(p => decide(p, pol).action),
+  reparsed: parseSensors(csv, D).errors}));
+"""
+    (tmp_path / "s.js").write_text(script)
+    out = subprocess.run(["node", str(tmp_path / "s.js"), str(tmp_path / "data.json"), str(tmp_path / "chg.json")],
+                         capture_output=True, text=True, check=True)
+    return json.loads(out.stdout)
+
+
+def test_monitoring_parity_and_sensor_round_trip(tmp_path):
+    path = os.path.join(ROOT, "data", "networks", "L-TOWN.inp")
+    if not os.path.exists(path):
+        pytest.skip("L-TOWN.inp not present")
+    from wateront.pipeline import build_knowledge_graph
+    res = build_knowledge_graph(path, verbose=False)
+    payload = export_payload(res)
+    sensed = [n[0] for n in payload["nodes"] if "PressureSensor" in n[4]]
+    unsensed = [n[0] for n in payload["nodes"] if n[3] == "J" and "PressureSensor" not in n[4]]
+    js = run_js_sensors(payload, add=unsensed[100:104], remove=sensed[:3], tmp_path=tmp_path)
+    assert js["monOk"]                      # browser coverage == Python on the original layout
+    assert not js["reparsed"]               # exported layout re-imports cleanly
+    f = tmp_path / "sensors.csv"
+    f.write_text(js["csv"])
+    rebuilt = build_knowledge_graph(path, sensors_csv=str(f), verbose=False)
+    py_mon = rebuilt.risk["monitored"].to_dict()
+    ids = [p["id"] for p in payload["pipes"]]
+    assert js["mon"] == [bool(py_mon[i]) for i in ids]
+    py = {d.facts["pipe"]: d.action for d in rebuilt.decisions}
+    assert js["actions"] == [py[i] for i in ids]
+    assert js["mon"] != [p["mon"] for p in payload["pipes"]]   # the change mattered
+
+
+def test_net3_without_sensors_is_all_monitored(built, tmp_path):
+    js = run_js_sensors(export_payload(built), add=[], remove=[], tmp_path=tmp_path)
+    assert js["monOk"] and all(js["mon"])

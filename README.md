@@ -101,6 +101,12 @@ The Ask tab can also save a question's results as CSV, and the Pipe tab can save
 
 **Editing pipes.** In the Pipe tab, **Edit asset record** changes install year, material, condition grade, last inspection, soil corrosivity and failure years. The failure probability and decision are recomputed at once with the same formulas as Python; `tests/test_web_parity.py` checks that browser edits, exported as an asset register and rebuilt in Python, give identical recommendations for every pipe. Hydraulic and service criticality come from network simulation and do not change in the browser. Edits stay in the page until saved in a network file, and the page warns before you leave with unsaved edits.
 
+**Asking Claude.** The Ask tab understands questions built from its known concepts (actions, risk bands, zones, materials, monitoring, pressure, dates and failure counts) and always shows how it read the question. For anything else, such as "why", comparisons or explanations, **Ask Claude about this** (on a pipe or on a question's results) copies your question together with the evidence, the policy in force and a summary of the rules, and opens claude.ai in a new tab: paste and send. Claude is asked to answer only from that evidence and to cite pipe and clause ids. This needs no API key and costs the site nothing; each person uses their own Claude account.
+
+**Pressure sensors and monitoring.** A pipe counts as monitored when a pressure sensor sits within two links of either end; monitoring feeds rule R5 and the questions about unmonitored mains. In the Data tab, **Place sensors on the map** lets you click junctions to add or remove pressure sensors and watch coverage and decisions update, which makes the page a simple sensor-placement what-if tool. Sensor layouts can be imported or saved as CSV (`element,type`), and Python reads the same file with `--sensors`, replacing the sensors marked in the `.inp`. The tests check that browser coverage matches Python before and after moving sensors.
+
+**Scope: pipes only.** Pipes are the assets assessed. Pumps, valves, tanks and reservoirs take part in the hydraulics and appear on the map, but receive no condition, risk or maintenance decision: they need different deterioration models (pump reliability and efficiency, valve operability, tank structural and water-quality inspection) and are left for future work.
+
 **Your data.** The Data tab explains what comes from the `.inp` and what is synthetic, and imports an asset register CSV straight into the page. Any subset of columns can be given, blank cells keep their current value, `none` in `failure_years` means no recorded failures, and invalid values (unknown materials, grades outside 1 to 5) stop the import with line-by-line reasons. The same rules apply in Python. Data that change the hydraulics or the network need a rebuild in Python or Colab:
 
 | Data | Python option | Template |
@@ -109,6 +115,7 @@ The Ask tab can also save a question's results as CSV, and the Pipe tab can save
 | Asset register | `--assets register.csv` | `data/asset_register_template.csv` |
 | Dated failures or leaks | `--failures failures.csv` | columns `pipe,date[,mode]` |
 | Critical customers | `--facilities facilities.csv` | `data/facilities_template.csv`; replaces the synthetic hospitals and schools |
+| Sensor layout | `--sensors sensors.csv` | `data/sensors_template.csv`; replaces the sensors marked in the `.inp` |
 | Policy text | `--guidelines policy.json` | `data/guidelines_template.json` |
 
 Then `python -m wateront web --inp mynet.inp --assets register.csv --json --out mynet.json` and open the file with **Open network…**. An opened file is read in the visitor's browser and never uploaded, so a utility can view its own network on the public page without sharing any data. With real data, the main practical step is matching register IDs to model pipe IDs; registers often use GIS asset IDs that do not match EPANET link names.

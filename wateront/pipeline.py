@@ -14,7 +14,7 @@ from .config import Config
 from .decision import Decision, build_decision_layer, load_guidelines
 from .kg import KnowledgeGraph
 from .physical import (build_instrumentation, build_physical_layer, build_pressure_zones,
-                       pipes_near_sensor)
+                       load_sensors, pipes_near_sensor)
 from .risk import build_risk_layer, choose_critical_facilities, compute_risk_table
 
 
@@ -42,7 +42,8 @@ def resolve_inp(name_or_path: str) -> str:
 
 def build_knowledge_graph(inp: str, cfg: Config | None = None, asset_csv: str | None = None,
                           guidelines_json: str | None = None, failures_csv: str | None = None,
-                          facilities_csv: str | None = None, verbose: bool = True) -> BuildResult:
+                          facilities_csv: str | None = None, sensors_csv: str | None = None,
+                          verbose: bool = True) -> BuildResult:
     cfg = cfg or Config()
     path = resolve_inp(inp)
     network_id = os.path.splitext(os.path.basename(path))[0]
@@ -51,7 +52,7 @@ def build_knowledge_graph(inp: str, cfg: Config | None = None, asset_csv: str | 
     log = print if verbose else (lambda *a, **k: None)
 
     build_physical_layer(wn, kg, network_id)
-    n_sensors = build_instrumentation(wn, kg, path)
+    n_sensors = build_instrumentation(wn, kg, path, load_sensors(sensors_csv, wn) if sensors_csv else None)
     build_pressure_zones(wn, kg, network_id)
     zones = [kg.node(z)["name"] for z in kg.nodes("PressureZone") if kg.node(z)["isSupplyZone"]]
     log(f"[physical] {len(kg.nodes('Pipe'))} pipes, {len(kg.nodes('Node'))} nodes, "

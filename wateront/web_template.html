@@ -88,6 +88,19 @@ form.edit label { display: grid; gap: 3px; color: var(--ink-2); }
 form.edit input, form.edit select { padding: 6px 8px; border: 1px solid var(--line); border-radius: 6px; background: var(--surface); color: var(--ink); }
 form.edit .wide { grid-column: 1 / -1; }
 form.edit .hint { font-size: 12.5px; color: var(--ink-2); }
+svg#map.placing { cursor: crosshair; }
+.banner {
+  position: absolute; left: 50%; top: 16px; transform: translateX(-50%); background: var(--ink); color: var(--bg);
+  padding: 8px 10px 8px 14px; border-radius: 8px; font-size: 14px; display: flex; gap: 12px; align-items: center; max-width: calc(100% - 100px);
+}
+.banner[hidden] { display: none; }
+dialog#claudeDlg { border: 1px solid var(--line); border-radius: 12px; background: var(--surface); color: var(--ink); width: min(560px, calc(100% - 32px)); padding: 20px; }
+dialog#claudeDlg::backdrop { background: rgba(15, 26, 32, .45); }
+dialog#claudeDlg h2 { margin: 0 0 6px; font-size: 18px; }
+dialog#claudeDlg p { font-size: 14px; margin: 0 0 10px; }
+dialog#claudeDlg label { font-weight: 600; font-size: 14px; }
+dialog#claudeDlg textarea { width: 100%; margin: 4px 0 8px; padding: 8px; border: 1px solid var(--line); border-radius: 8px; background: var(--bg); color: var(--ink); font: inherit; font-size: 14px; }
+.hint { color: var(--ink-2); font-size: 13px; }
 .dl { background: none; border: 0; color: var(--accent); text-decoration: underline; cursor: pointer; padding: 0; font-size: 13.5px; }
 #loadStatus:empty { display: none; }
 body.dropping .mapwrap { outline: 3px dashed var(--accent); outline-offset: -8px; }
@@ -231,6 +244,7 @@ footer.note { font-size: 12.5px; color: var(--ink-2); padding: 12px 20px; border
         <button type="button" role="menuitem" data-save="decisions"><b>Decisions table (.csv)</b><span>Every pipe with its risk, recommended action, rule and clauses. Opens in Excel.</span></button>
         <button type="button" role="menuitem" data-save="register"><b>Asset register (.csv)</b><span>Asset facts in the format Python reads with <code>--assets</code>.</span></button>
         <button type="button" role="menuitem" data-save="svg"><b>Map picture (.svg)</b><span>The map as shown now, with its legend, for papers and slides.</span></button>
+        <button type="button" role="menuitem" data-save="sensors"><b>Sensor layout (.csv)</b><span>Every sensor, in the format Python reads with <code>--sensors</code>.</span></button>
       </div>
     </details>
     <input type="file" id="openFile" accept=".json,application/json" hidden>
@@ -247,6 +261,8 @@ footer.note { font-size: 12.5px; color: var(--ink-2); padding: 12px 20px; border
       <button id="zreset" aria-label="Fit network to view">⤢</button>
     </div>
     <div class="legend" id="legend"></div>
+    <div class="banner" id="placeBanner" hidden>Placing pressure sensors: click a junction to add or remove one.
+      <button class="btn" type="button" id="placeDone">Done</button></div>
     <div class="tip" id="tip"></div>
   </div>
 
@@ -307,7 +323,16 @@ footer.note { font-size: 12.5px; color: var(--ink-2); padding: 12px 20px; border
       <table class="src">
         <tr><th>From the EPANET model (.inp)</th><td>Layout, lengths and diameters; simulated pressures and flows; hydraulic criticality; supply zones; sensors marked in the file; customer demand types.</td></tr>
         <tr><th>Synthetic unless you supply them</th><td>Install year, material, condition grade, last inspection, failure history, soil, and hospitals, schools or care homes.</td></tr>
+        <tr><th>Assets assessed</th><td>Pipes only. Pumps, valves, tanks and reservoirs take part in the hydraulics and appear on the map, but receive no condition, risk or maintenance decision.</td></tr>
       </table>
+      <h3>Pressure sensors</h3>
+      <p>A pipe counts as monitored when a pressure sensor sits within two links of either end. Monitoring feeds rule R5, which sends critical, high-risk mains that nobody is watching for inspection, and the questions about unmonitored mains. Add or remove sensors to see how coverage and decisions change.</p>
+      <div class="btnrow">
+        <button class="btn" id="placeBtn" type="button">Place sensors on the map</button>
+        <button class="btn quiet" id="sensorImportBtn" type="button">Import sensor layout…</button>
+        <input type="file" id="sensorFile" accept=".csv,text/csv" hidden>
+      </div>
+      <div id="sensorStatus" role="status" aria-live="polite"></div>
       <h3>Update asset records here</h3>
       <p>Import an asset register to replace synthetic facts with real ones. Only the columns and cells you fill in are used; blank cells keep the current value. Write <code>none</code> in <code>failure_years</code> for a pipe with no recorded failures. The file stays in your browser.</p>
       <div class="btnrow">
@@ -332,6 +357,18 @@ footer.note { font-size: 12.5px; color: var(--ink-2); padding: 12px 20px; border
   </aside>
 </div>
 
+<dialog id="claudeDlg">
+  <form method="dialog" id="claudeForm">
+    <h2>Ask Claude about this</h2>
+    <p id="claudeWhat"></p>
+    <label for="claudeQ">Your question</label>
+    <textarea id="claudeQ" rows="3"></textarea>
+    <p class="hint">The question and the evidence are copied together. A new Claude tab opens: paste with Ctrl+V (⌘V on a Mac) and send. Claude is asked to answer only from this evidence and to cite pipe and clause ids.</p>
+    <div id="claudeFallback" hidden><p class="hint">Copying was blocked by the browser. Select all of this text, copy it, and paste it into Claude:</p><textarea id="claudeText" rows="8" readonly></textarea></div>
+    <div class="btnrow"><button class="btn" type="button" id="claudeGo">Copy and open Claude</button><button class="btn quiet" value="cancel">Close</button></div>
+    <p id="claudeDone" class="hint" role="status"></p>
+  </form>
+</dialog>
 <script>
 const DATA = /*__WATERONT_DATA__*/null;
 
@@ -526,6 +563,62 @@ function parseRegister(text, pipeIds, cfg) {
   });
   return { errors, edits, unknown };
 }
+// --- sensors: mirrors physical.pipes_near_sensor (pressure sensor within 2 links of a pipe end)
+const SENSOR_SHORT = { PressureSensor: "pressure", FlowSensor: "flow", LevelSensor: "level", AMRMeter: "amr" };
+const SENSOR_CLASS = { pressure: "PressureSensor", pressuresensor: "PressureSensor", flow: "FlowSensor", flowsensor: "FlowSensor",
+                       level: "LevelSensor", levelsensor: "LevelSensor", amr: "AMRMeter", amrmeter: "AMRMeter", meter: "AMRMeter" };
+function monitoringOf(D, hops = 2) {
+  const n = D.nodes.length, adj = Array.from({ length: n }, () => []);
+  for (const l of [...D.pipes, ...(D.devices || [])]) { adj[l.s].push(l.e); adj[l.e].push(l.s); }
+  const sensed = [];
+  D.nodes.forEach((nd, i) => { if (nd[4].includes("PressureSensor")) sensed.push(i); });
+  if (!sensed.length) return D.pipes.map(() => true);      // no sensor data: status unknown, as in Python
+  const near = new Uint8Array(n);
+  for (const s0 of sensed) {
+    const seen = new Set([s0]); let frontier = [s0];
+    for (let d = 0; d < hops; d++) {
+      const next = [];
+      for (const u of frontier) for (const v of adj[u]) if (!seen.has(v)) { seen.add(v); next.push(v); }
+      frontier = next;
+    }
+    for (const v of seen) near[v] = 1;
+  }
+  return D.pipes.map(p => !!(near[p.s] || near[p.e]));
+}
+function sensorLayout(D) {
+  const out = {};
+  const add = (elem, list) => { if (list && list.length) out[elem] = list.slice(); };
+  D.nodes.forEach(nd => add(nd[0], nd[4]));
+  D.pipes.forEach(p => add(p.id, p.sensors));
+  (D.devices || []).forEach(d => add(d.id, d.sensors));
+  return out;
+}
+function sensorCsv(D) {
+  const rows = [["element", "type"]];
+  for (const [elem, list] of Object.entries(sensorLayout(D))) for (const c of list) rows.push([elem, SENSOR_SHORT[c] || c]);
+  return toCsv(rows);
+}
+function parseSensors(text, D) {
+  const rows = parseCsv(text), errors = [], layout = {};
+  if (!rows.length) return { errors: ["the file is empty"], layout };
+  const head = rows[0].map(h => h.trim().toLowerCase()), ce = head.indexOf("element"), ct = head.indexOf("type");
+  if (ce < 0 || ct < 0) return { errors: ["the first row must contain 'element' and 'type' columns"], layout };
+  const known = new Set([...D.nodes.map(n => n[0]), ...D.pipes.map(p => p.id), ...(D.devices || []).map(d => d.id)]);
+  rows.slice(1).forEach((r, k) => {
+    const elem = (r[ce] || "").trim(), typ = (r[ct] || "").trim();
+    if (!elem) return;
+    const cls = SENSOR_CLASS[typ.toLowerCase().replace(/[\s_]/g, "")];
+    if (!cls) errors.push(`line ${k + 2}: type “${typ}” is not pressure, flow, level or amr`);
+    else if (!known.has(elem)) errors.push(`line ${k + 2}: “${elem}” is not a node or link in ${D.network}`);
+    else { layout[elem] = layout[elem] || []; if (!layout[elem].includes(cls)) layout[elem].push(cls); }
+  });
+  return { errors, layout };
+}
+function applySensorLayout(D, layout) {
+  D.nodes.forEach(nd => { nd[4] = (layout[nd[0]] || []).slice(); });
+  D.pipes.forEach(p => { p.sensors = (layout[p.id] || []).slice(); });
+  (D.devices || []).forEach(d => { d.sensors = (layout[d.id] || []).slice(); });
+}
 // LOGIC END
 
 function openNetwork(D, label) {
@@ -579,6 +672,10 @@ function main(D) {
   const origOf = p => (isEdited(p.id) ? { ...p, ...originals[p.id] } : p);
   window.onbeforeunload = () => (dirty ? "You have edits that are not saved." : undefined);
   window.__woDirty = () => dirty;
+  // sensor layout as first opened (a saved network file carries its own starting layout)
+  const sensorStart = JSON.parse(JSON.stringify(D.sensorsOriginal || sensorLayout(D)));
+  let placing = false;
+  const hasStart = (elem, cls) => (sensorStart[elem] || []).includes(cls);
 
   $("netlabel").textContent = `${D.network}: ${D.pipes.length} pipes, ${D.graph.nodes.toLocaleString()} graph nodes`;
   $("footnote").textContent = `Asset records synthetic (seed ${D.config.seed}); policy clauses paraphrased.` +
@@ -625,10 +722,11 @@ function main(D) {
         s.setAttribute("fill", css("--accent"));
         $("gNodes").appendChild(s);
       }
-      if ($("showSensors").checked && n[4].includes("PressureSensor")) {
+      if (($("showSensors").checked || placing) && n[4].includes("PressureSensor")) {
         const c = document.createElementNS(svgNS, "circle");
         c.setAttribute("cx", X(i)); c.setAttribute("cy", Y(i)); c.setAttribute("r", r * 1.4);
-        c.setAttribute("fill", css("--surface")); c.setAttribute("stroke", css("--accent"));
+        c.setAttribute("fill", hasStart(n[0], "PressureSensor") ? css("--surface") : css("--accent"));
+        c.setAttribute("stroke", css("--accent"));
         c.setAttribute("stroke-width", r * 0.6);
         $("gSensors").appendChild(c);
       }
@@ -647,8 +745,8 @@ function main(D) {
       keys: [["Low", "--r-neg"], ["Medium", "--r-tol"], ["High", "--r-sig"], ["Critical", "--r-int"]] },
     svc: { label: "Service criticality", get: p => p.svc,
       keys: [["Low", "--r-neg"], ["Medium", "--r-tol"], ["High", "--r-sig"], ["Critical", "--r-int"]] },
-    mon: { label: "Pressure sensor within two segments", get: p => (p.mon === false ? "No" : "Yes"),
-      keys: [["Yes", "--a-insp"], ["No", "--r-sig"]] },
+    mon: { label: "Pressure monitoring", get: p => (p.mon === false ? "Not monitored" : "Monitored"),
+      keys: [["Monitored", "--a-insp"], ["Not monitored", "--r-sig"]] },
     zone: { label: "Supply zone (fed by)", get: p => p.zone || "none",
       keys: D.zones.map((z, i) => [z.id, ["--a-insp", "--r-sig", "--a-rehab", "--r-neg", "--r-tol"][i % 5]]) },
     mat: { label: "Material", get: p => p.mat,
@@ -710,6 +808,67 @@ function main(D) {
     });
     return best;
   }
+  function nearestJunction(cx, cy) {
+    const [x, y, s] = toData(cx, cy);
+    let best = -1, bd = (14 * s) ** 2;
+    D.nodes.forEach((n, i) => {
+      if (n[3] !== "J") return;
+      const d = (X(i) - x) ** 2 + (Y(i) - y) ** 2;
+      if (d < bd) { bd = d; best = i; }
+    });
+    return best;
+  }
+  function toggleSensor(i) {
+    const list = D.nodes[i][4], k = list.indexOf("PressureSensor");
+    if (k >= 0) list.splice(k, 1); else list.push("PressureSensor");
+    dirty = true; refreshMonitoring();
+  }
+  function refreshMonitoring() {
+    const m = monitoringOf(D);
+    D.pipes = D.pipes.map((p, i) => (p.mon === m[i] ? p : { ...p, mon: m[i] }));
+    drawMarkers(); afterEdit(); renderSensors();
+  }
+  function sensorCounts() {
+    const now = sensorLayout(D), added = [], removed = [];
+    for (const [e, l] of Object.entries(now)) for (const c of l) if (!hasStart(e, c)) added.push(`${e} (${SENSOR_SHORT[c]})`);
+    for (const [e, l] of Object.entries(sensorStart)) for (const c of l) if (!(now[e] || []).includes(c)) removed.push(`${e} (${SENSOR_SHORT[c]})`);
+    const pressure = D.nodes.filter(n => n[4].includes("PressureSensor")).length;
+    return { added, removed, pressure };
+  }
+  function renderSensors() {
+    const { added, removed, pressure } = sensorCounts(), mon = D.pipes.filter(p => p.mon !== false).length;
+    const r5 = decisions.filter(d => d.rule === "R5").length;
+    const anySensor = D.nodes.some(n => n[4].includes("PressureSensor"));
+    $("sensorStatus").innerHTML = `<div class="msg">${pressure} pressure sensor(s); ` +
+      (anySensor ? `${mon} of ${D.pipes.length} pipes monitored; ${r5} inspection(s) from rule R5.` : `no sensor data, so every pipe is treated as monitored.`) +
+      (added.length || removed.length ? `<br>Changed from the original layout: ${added.length} added${added.length ? ` (${esc(added.slice(0, 6).join(", "))}${added.length > 6 ? "…" : ""})` : ""}, ` +
+        `${removed.length} removed${removed.length ? ` (${esc(removed.slice(0, 6).join(", "))}${removed.length > 6 ? "…" : ""})` : ""}. ` +
+        `<button class="dl" type="button" id="sensorRevert">Restore original sensors</button>` : "") + `</div>`;
+    if ($("sensorRevert")) $("sensorRevert").onclick = () => { applySensorLayout(D, JSON.parse(JSON.stringify(sensorStart))); dirty = true; refreshMonitoring(); };
+  }
+  function setPlacing(v) {
+    placing = v;
+    svg.classList.toggle("placing", v);
+    $("placeBanner").hidden = !v;
+    $("placeBtn").textContent = v ? "Stop placing sensors" : "Place sensors on the map";
+    if (v && $("colorBy").value !== "mon") { $("colorBy").value = "mon"; paint(); }
+    drawMarkers();
+  }
+  $("placeBtn").onclick = () => setPlacing(!placing);
+  $("placeDone").onclick = () => setPlacing(false);
+  $("sensorImportBtn").onclick = () => $("sensorFile").click();
+  $("sensorFile").onchange = async e => {
+    const file = e.target.files[0]; e.target.value = "";
+    if (!file) return;
+    const res = parseSensors(await file.text(), D);
+    if (res.errors.length) {
+      $("sensorStatus").innerHTML = `<div class="msg error">Nothing was imported from ${esc(file.name)}. Fix these and try again:<ul>${
+        res.errors.slice(0, 8).map(x => `<li>${esc(x)}</li>`).join("")}</ul></div>`;
+      return;
+    }
+    applySensorLayout(D, res.layout); dirty = true; refreshMonitoring();
+    $("sensorStatus").insertAdjacentHTML("afterbegin", `<div class="msg">Replaced the sensor layout with ${esc(file.name)}.</div>`);
+  };
   const pointers = new Map();
   let drag = null, pinch = null;
   on(svg, "pointerdown", e => {
@@ -731,7 +890,17 @@ function main(D) {
       if (drag.moved) { view = { ...drag.v, x: drag.v.x - dx * s, y: drag.v.y - dy * s }; setView(); }
       return;
     }
-    const i = nearest(e.clientX, e.clientY), tip = $("tip");
+    const tip = $("tip");
+    if (placing) {
+      const j = nearestJunction(e.clientX, e.clientY);
+      if (j >= 0 && e.pointerType === "mouse") {
+        const r = $("mapwrap").getBoundingClientRect(), has = D.nodes[j][4].includes("PressureSensor");
+        tip.style.display = "block"; tip.style.left = (e.clientX - r.left) + "px"; tip.style.top = (e.clientY - r.top) + "px";
+        tip.textContent = `${D.nodes[j][0]}: click to ${has ? "remove the" : "add a"} pressure sensor`;
+      } else tip.style.display = "none";
+      return;
+    }
+    const i = nearest(e.clientX, e.clientY);
     if (i >= 0 && e.pointerType === "mouse") {
       const r = $("mapwrap").getBoundingClientRect(), p = D.pipes[i];
       tip.style.display = "block"; tip.style.left = (e.clientX - r.left) + "px"; tip.style.top = (e.clientY - r.top) + "px";
@@ -741,7 +910,10 @@ function main(D) {
   const endPointer = e => {
     pointers.delete(e.pointerId);
     if (pointers.size < 2) pinch = null;
-    if (drag && !drag.moved && pointers.size === 0) { const i = nearest(e.clientX, e.clientY); if (i >= 0) selectPipe(i, true); }
+    if (drag && !drag.moved && pointers.size === 0) {
+      if (placing) { const j = nearestJunction(e.clientX, e.clientY); if (j >= 0) toggleSensor(j); }
+      else { const i = nearest(e.clientX, e.clientY); if (i >= 0) selectPipe(i, true); }
+    }
     if (pointers.size === 0) { drag = null; svg.classList.remove("dragging"); }
   };
   on(svg, "pointerup", endPointer);
@@ -791,6 +963,7 @@ function main(D) {
     const tools = `<div class="tools">
         <button class="btn quiet" type="button" id="editBtn">${editing ? "Cancel editing" : "Edit asset record"}</button>
         ${isEdited(p.id) ? `<button class="btn quiet" type="button" id="revertBtn">Revert edits</button>` : ""}
+        <button class="btn quiet" type="button" id="claudePipeBtn">Ask Claude about this pipe</button>
         <button class="dl" type="button" id="trailBtn">Download audit trail</button></div>`;
     const form = editing ? `<form class="edit" id="editForm">
         <label>Install year<input name="installYear" type="number" min="1800" max="${policy.referenceYear}" value="${policy.referenceYear - p.age}" required></label>
@@ -831,6 +1004,8 @@ function main(D) {
     $("editBtn").onclick = () => { editing = !editing; selectPipe(i); };
     if ($("revertBtn")) $("revertBtn").onclick = () => { D.pipes[i] = origOf(p); delete originals[p.id]; dirty = true; editing = false; afterEdit(); };
     $("trailBtn").onclick = () => download(`${p.id}_audit_trail.md`, trailMarkdown(i), "text/markdown");
+    $("claudePipeBtn").onclick = () => openClaude(`Claude will receive pipe ${p.id}’s audit trail and the policy in force.`,
+      trailMarkdown(i), `Why is ${p.id} recommended for ${decisions[i].action.toLowerCase()}, and what would change that?`);
     if (editing) $("editForm").onsubmit = ev => {
       ev.preventDefault();
       const f = new FormData(ev.target), yr = +f.get("installYear"), insp = +f.get("insp");
@@ -930,8 +1105,11 @@ function main(D) {
          <span class="why">${esc(why(p, d))}.</span></button>
        <div class="cites">Authorised by ${glChips(d.guidelines)}</div></li>`).join("")}</ol>`
       : `<p class="empty">No pipe satisfies all of these conditions under the current policy. Remove a condition, or loosen the policy in the Policy tab.</p>`;
-    const dl = res.length ? `<p style="margin-top:10px"><button class="dl" type="button" id="resultsBtn">Download these results (.csv)</button></p>` : "";
+    const dl = `<div class="btnrow" style="margin-top:10px"><button class="btn quiet" type="button" id="claudeResBtn">Ask Claude about ${res.length ? "these results" : "this question"}</button>` +
+      (res.length ? `<button class="dl" type="button" id="resultsBtn">Download these results (.csv)</button>` : "") + `</div>`;
     $("answer").innerHTML = understood + list + dl;
+    $("claudeResBtn").onclick = () => openClaude(`Claude will receive your question, how the explorer read it, the ${res.length} pipe(s) found with their evidence, and the clauses cited.`,
+      resultsEvidence(q, parts, res, total), q);
     if (res.length) $("resultsBtn").onclick = () => download(`${D.network}_question_results.csv`,
       toCsv([["question", q], [], ["rank", "pipe", "action", "rule", "reason", "clauses"],
              ...res.map(({ pipe: p, d }, k) => [k + 1, p.id, d.action, d.rule, why(p, d), d.guidelines.join(";")])]), "text/csv");
@@ -993,6 +1171,61 @@ function main(D) {
   $("r5").onchange = () => { policy.r5 = $("r5").checked; recompute(); };
   $("resetPolicy").onclick = () => { policy = defaultPolicy(D.config); syncInputs(); recompute(); };
 
+  // ------------------------------------------------------------------- ask Claude
+  const CLAUDE_URL = "https://claude.ai/new";
+  function policyText() {
+    return [`- Failure-probability band limits per km: ${policy.pofBands.join(", ")}`,
+      `- Design life (years): ${Object.entries(policy.designLife).map(([m, v]) => `${MAT_NAMES[m] || m} ${v}`).join(", ")}`,
+      `- Inspection interval (years): ${Object.entries(policy.inspectionInterval).map(([r, v]) => `${r} ${v}`).join(", ")}`,
+      `- Rule R5 (inspect unmonitored critical high-risk mains): ${policy.r5 ? "on" : "off"}`].join("\n");
+  }
+  function claudePrompt(question, evidence) {
+    return `I am using the WaterOnt explorer, a knowledge-graph decision-support tool for water distribution networks. ` +
+      `Each pipe's recommendation is computed by policy rules from its asset record and risk profile, and every recommendation cites the clauses that authorise it.\n\n` +
+      `Please answer my question using only the evidence below. Cite pipe ids and clause ids (such as G-REPL-01) for each point. ` +
+      `If the evidence cannot answer the question, say so and say what data would be needed. ` +
+      `Asset records in this network are synthetic demonstration data, and the clauses are paraphrased stand-ins for real standards.\n\n` +
+      `QUESTION: ${question}\n\n--- EVIDENCE (${D.network}) ---\n${evidence}\n\n--- POLICY IN FORCE ---\n${policyText()}\n\n` +
+      `--- HOW THE RULES WORK ---\nR1 Replacement: overall risk Intolerable and age beyond design life. R2 Rehabilitation: risk Significant or Intolerable and condition grade 4 or 5. ` +
+      `R3 Inspection: Intolerable risk within design life. R4 Inspection: inspection interval for the risk category exceeded. ` +
+      `R5 Inspection: Significant or Intolerable risk, High or Critical hydraulic criticality, and no pressure sensor within two links. R0 Monitor: otherwise. ` +
+      `Overall risk = likelihood band × consequence band (the higher of hydraulic and service criticality), each 1 to 4: up to 2 Negligible, up to 4 Tolerable, up to 8 Significant, above 8 Intolerable.\n`;
+  }
+  let claudeEvidence = "";
+  function openClaude(what, evidence, question) {
+    claudeEvidence = evidence;
+    $("claudeWhat").textContent = what;
+    $("claudeQ").value = question;
+    $("claudeFallback").hidden = true; $("claudeDone").textContent = "";
+    $("claudeDlg").showModal();
+    $("claudeQ").focus(); $("claudeQ").select();
+  }
+  $("claudeGo").onclick = () => {
+    const text = claudePrompt($("claudeQ").value.trim() || "Explain this in plain language.", claudeEvidence);
+    const tab = window.open(CLAUDE_URL, "_blank");   // "noopener" would hide whether the tab opened
+    if (tab) tab.opener = null;
+    const done = ok => {
+      if (ok) $("claudeDone").textContent = tab ? "Copied. Paste it into the new Claude tab and send." :
+        "Copied. Your browser blocked the new tab, so open claude.ai yourself and paste.";
+      else { $("claudeFallback").hidden = false; $("claudeText").value = text; $("claudeText").select(); }
+    };
+    if (navigator.clipboard && window.isSecureContext) navigator.clipboard.writeText(text).then(() => done(true), () => done(false));
+    else done(false);
+  };
+  function resultsEvidence(q, parts, res, total) {
+    const ids = new Set();
+    const lines = [`Question asked in the explorer: “${q}”`, `Interpreted as: ${parts.join("; ") || "no filter recognised"}`,
+      `Matches: ${total}${total > res.length ? ` (top ${res.length} listed)` : ""}`, ""];
+    res.forEach(({ pipe: p, d }, k) => {
+      d.guidelines.forEach(g => ids.add(g));
+      lines.push(`${k + 1}. ${p.id}: ${d.action} (rule ${d.rule}): ${why(p, d)}. ${MAT_NAMES[p.mat]}, installed ${policy.referenceYear - p.age}, ` +
+        `grade ${p.grade}, ${p.fails} failure(s), PoF ${(p.pofKm * 100).toFixed(0)}%/km (${d.pofBand}), hydraulic ${p.hyd}, service ${p.svc}, ` +
+        `overall ${d.overall}, zone ${p.zone || "none"}, ${p.mon === false ? "unmonitored" : "monitored"}. Clauses: ${d.guidelines.join(", ")}.`);
+    });
+    lines.push("", "Clauses cited:", ...[...ids].map(g => `- ${g} (${glById[g].framework}) ${glById[g].title}: ${glById[g].text}`));
+    return lines.join("\n");
+  }
+
   // ------------------------------------------------------------------- downloads
   function download(name, text, type) {
     const url = URL.createObjectURL(new Blob([text], { type: type + ";charset=utf-8" }));
@@ -1036,12 +1269,14 @@ function main(D) {
     $("saveMenu").open = false;
     const kind = b.dataset.save, base = `${D.network}_seed${D.config.seed}`;
     if (kind === "network") {
-      const out = { ...D, policy, edited: Object.entries(originals).map(([id, original]) => ({ id, original })), savedOn: stamp() };
+      const out = { ...D, policy, edited: Object.entries(originals).map(([id, original]) => ({ id, original })),
+                    sensorsOriginal: sensorStart, savedOn: stamp() };
       download(`${base}${Object.keys(originals).length ? "_edited" : ""}.json`, JSON.stringify(out), "application/json");
       dirty = false;
     }
     if (kind === "decisions") download(`${base}_decisions.csv`, decisionsCsv(), "text/csv");
     if (kind === "register") download(`${base}_asset_register.csv`, toRegisterCsv(D.pipes, { ...D.config, referenceYear: policy.referenceYear }), "text/csv");
+    if (kind === "sensors") download(`${base}_sensors.csv`, sensorCsv(D), "text/csv");
     if (kind === "svg") download(`${base}_map_${$("colorBy").value}.svg`, svgPicture(), "image/svg+xml");
   };
   on(document, "click", e => { if (!$("saveMenu").contains(e.target)) $("saveMenu").open = false; });
@@ -1088,7 +1323,8 @@ function main(D) {
   $("showSensors").onchange = () => { drawMarkers(); paint(); };
   on(window.matchMedia("(prefers-color-scheme: dark)"), "change", () => { drawMarkers(); paint(); drawSelection(); });
 
-  syncInputs(); drawMarkers(); recompute(); renderEdits(); $("importStatus").innerHTML = "";
+  setPlacing(false);
+  syncInputs(); drawMarkers(); recompute(); renderEdits(); renderSensors(); $("importStatus").innerHTML = "";
   const h = decodeURIComponent(location.hash.slice(1));
   if (h in pipeIndex) { selectPipe(pipeIndex[h]); showTab("pipe"); }
 }

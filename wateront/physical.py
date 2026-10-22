@@ -194,19 +194,55 @@ def parse_inp_annotations(path: str) -> dict[str, list[tuple[str, str]]]:
     return out
 
 
-def build_instrumentation(wn: wntr.network.WaterNetworkModel, kg: KnowledgeGraph, inp_path: str) -> int:
-    """Sensor nodes: (element)-[:OBSERVED_BY]->(:Sensor {observedProperty})."""
+SENSOR_ALIASES = {"pressure": "PressureSensor", "pressuresensor": "PressureSensor",
+                  "flow": "FlowSensor", "flowsensor": "FlowSensor",
+                  "level": "LevelSensor", "levelsensor": "LevelSensor",
+                  "amr": "AMRMeter", "amrmeter": "AMRMeter", "meter": "AMRMeter"}
+SENSOR_PROPERTY = {cls: prop for _, cls, prop in SENSOR_PATTERNS}
+
+
+def load_sensors(path: str, wn: wntr.network.WaterNetworkModel) -> dict[str, list[tuple[str, str]]]:
+    """Sensor list CSV with columns `element,type` (type: pressure, flow, level or amr, or
+    the class names). The file is the complete sensor layout and replaces any sensors
+    marked in the .inp. Raises ValueError listing every bad row."""
+    import pandas as pd
+    df = pd.read_csv(path, dtype=str, keep_default_na=False)
+    if not {"element", "type"} <= set(df.columns):
+        raise ValueError(f"{path}: needs columns 'element' and 'type'")
+    out: dict[str, list[tuple[str, str]]] = defaultdict(list)
+    errors = []
+    for n, r in enumerate(df.to_dict("records"), start=2):
+        elem, typ = r["element"].strip(), r["type"].strip()
+        if not elem:
+            continue
+        cls = SENSOR_ALIASES.get(typ.lower().replace(" ", "").replace("_", ""))
+        if cls is None:
+            errors.append(f"line {n}: type '{typ}' is not pressure, flow, level or amr")
+        elif elem not in wn.node_name_list and elem not in wn.link_name_list:
+            errors.append(f"line {n}: '{elem}' is not a node or link in the model")
+        elif (cls, SENSOR_PROPERTY[cls]) not in out[elem]:
+            out[elem].append((cls, SENSOR_PROPERTY[cls]))
+    if errors:
+        raise ValueError(f"{path}: " + "; ".join(errors[:20]))
+    return out
+
+
+def build_instrumentation(wn: wntr.network.WaterNetworkModel, kg: KnowledgeGraph, inp_path: str,
+                          sensors: dict[str, list[tuple[str, str]]] | None = None) -> int:
+    """Sensor nodes: (element)-[:OBSERVED_BY]->(:Sensor {observedProperty}). Uses the
+    .inp annotations unless a sensor layout (from `load_sensors`) is given."""
     n = 0
-    for elem, sensors in parse_inp_annotations(inp_path).items():
+    source = ".inp annotation" if sensors is None else "sensor list"
+    for elem, sensors_here in (parse_inp_annotations(inp_path) if sensors is None else sensors).items():
         if elem in wn.node_name_list:
             target = node_uid(wn, elem)
         elif elem in wn.link_name_list:
             target = link_uid(wn, elem)
         else:
             continue
-        for cls, prop in sensors:
+        for cls, prop in sensors_here:
             sid = kg.add_node(f"SEN:{cls}:{elem}", cls, "Sensor", name=f"{cls} @ {elem}",
-                              observedProperty=prop, source=".inp annotation")
+                              observedProperty=prop, source=source)
             kg.add_edge(target, "OBSERVED_BY", sid)
             n += 1
     return n
