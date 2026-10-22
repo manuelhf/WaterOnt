@@ -1,0 +1,225 @@
+@prefix wno:  <http://www.ncl.ac.uk/waternetwork-ontology#> .
+@prefix owl:  <http://www.w3.org/2002/07/owl#> .
+@prefix rdf:  <http://www.w3.org/1999/02/22-rdf-syntax-ns#> .
+@prefix rdfs: <http://www.w3.org/2000/01/rdf-schema#> .
+@prefix xsd:  <http://www.w3.org/2001/XMLSchema#> .
+@prefix qudt: <http://qudt.org/schema/qudt#> .
+@prefix unit: <http://qudt.org/vocab/unit#> .
+@prefix dct:  <http://purl.org/dc/terms/> .
+@prefix sosa: <http://www.w3.org/ns/sosa/> .
+
+<http://www.ncl.ac.uk/waternetwork-ontology> a owl:Ontology ;
+    rdfs:label "WaterOnt" ;
+    dct:description "Four-layer ontology (Physical, Asset, Risk, Decision) for explainable asset management in water distribution networks." ;
+    owl:versionInfo "0.2.0" ;
+    dct:creator "Manuel Herrera et al." ;
+    dct:license <https://creativecommons.org/licenses/by/4.0/> .
+
+#################################################################
+# PHYSICAL LAYER (Appendix A.2-A.5)
+#################################################################
+
+wno:WaterNetwork        a owl:Class ; rdfs:comment "Root container for all elements of one network instance." .
+wno:WaterNetworkElement a owl:Class ; rdfs:comment "Abstract: all physical components." .
+wno:OperationalElement  a owl:Class ; rdfs:comment "Abstract: behavioural concepts governing network dynamics; not physical assets." .
+
+wno:Node a owl:Class ; rdfs:subClassOf wno:WaterNetworkElement .
+wno:Junction  a owl:Class ; rdfs:subClassOf wno:Node ; rdfs:comment "EPANET [JUNCTIONS]" .
+wno:Reservoir a owl:Class ; rdfs:subClassOf wno:Node ; rdfs:comment "EPANET [RESERVOIRS]" .
+wno:Tank      a owl:Class ; rdfs:subClassOf wno:Node ; rdfs:comment "EPANET [TANKS]" .
+
+wno:Link  a owl:Class ; rdfs:subClassOf wno:WaterNetworkElement .
+wno:Pipe  a owl:Class ; rdfs:subClassOf wno:Link ; rdfs:comment "EPANET [PIPES]" .
+wno:Pump  a owl:Class ; rdfs:subClassOf wno:Link ; rdfs:comment "EPANET [PUMPS]" .
+wno:Valve a owl:Class ; rdfs:subClassOf wno:Link ; rdfs:comment "EPANET [VALVES]" .
+wno:PressureReducingValve   a owl:Class ; rdfs:subClassOf wno:Valve .
+wno:PressureSustainingValve a owl:Class ; rdfs:subClassOf wno:Valve .
+wno:PressureBreakingValve   a owl:Class ; rdfs:subClassOf wno:Valve .
+wno:FlowControlValve        a owl:Class ; rdfs:subClassOf wno:Valve .
+wno:ThrottleControlValve    a owl:Class ; rdfs:subClassOf wno:Valve .
+wno:GeneralPurposeValve     a owl:Class ; rdfs:subClassOf wno:Valve .
+
+wno:DemandPattern     a owl:Class ; rdfs:subClassOf wno:OperationalElement ; rdfs:comment "EPANET [PATTERNS]" .
+wno:Curve             a owl:Class ; rdfs:subClassOf wno:OperationalElement ; rdfs:comment "EPANET [CURVES]" .
+wno:PumpCurve         a owl:Class ; rdfs:subClassOf wno:Curve .
+wno:EfficiencyCurve   a owl:Class ; rdfs:subClassOf wno:Curve .
+wno:VolumeCurve       a owl:Class ; rdfs:subClassOf wno:Curve .
+wno:HeadlossCurve     a owl:Class ; rdfs:subClassOf wno:Curve ; rdfs:comment "GPV head-loss curve (not in Table A.2)." .
+wno:SimpleControl     a owl:Class ; rdfs:subClassOf wno:OperationalElement ; rdfs:comment "EPANET [CONTROLS]" .
+wno:Rule              a owl:Class ; rdfs:subClassOf wno:OperationalElement ; rdfs:comment "EPANET [RULES]" .
+wno:OperationalStatus a owl:Class ; rdfs:subClassOf wno:OperationalElement ; rdfs:comment "Reified link state with reason attribution." .
+
+# Disjointness (A.3)
+[] a owl:AllDisjointClasses ; owl:members ( wno:WaterNetwork wno:WaterNetworkElement wno:OperationalElement ) .
+wno:Node owl:disjointWith wno:Link .
+[] a owl:AllDisjointClasses ; owl:members ( wno:Junction wno:Reservoir wno:Tank ) .
+[] a owl:AllDisjointClasses ; owl:members ( wno:Pipe wno:Pump wno:Valve ) .
+[] a owl:AllDisjointClasses ; owl:members ( wno:PressureReducingValve wno:PressureSustainingValve
+    wno:PressureBreakingValve wno:FlowControlValve wno:ThrottleControlValve wno:GeneralPurposeValve ) .
+
+# Object properties (A.4)
+wno:startsAt a owl:ObjectProperty, owl:FunctionalProperty ; rdfs:domain wno:Link ; rdfs:range wno:Node ; owl:inverseOf wno:isStartOf .
+wno:endsAt   a owl:ObjectProperty, owl:FunctionalProperty ; rdfs:domain wno:Link ; rdfs:range wno:Node ; owl:inverseOf wno:isEndOf .
+wno:isStartOf a owl:ObjectProperty .
+wno:isEndOf   a owl:ObjectProperty .
+wno:containsNode a owl:ObjectProperty ; rdfs:domain wno:WaterNetwork ; rdfs:range wno:Node ; owl:inverseOf wno:nodeOf .
+wno:containsLink a owl:ObjectProperty ; rdfs:domain wno:WaterNetwork ; rdfs:range wno:Link ; owl:inverseOf wno:linkOf .
+wno:nodeOf a owl:ObjectProperty .
+wno:linkOf a owl:ObjectProperty .
+wno:followsPattern a owl:ObjectProperty ; rdfs:domain wno:Junction ; rdfs:range wno:DemandPattern .
+# Not functional: a head pump may also carry an efficiency curve; tanks and GPVs carry curves too.
+wno:hasCurve  a owl:ObjectProperty ; rdfs:domain [ owl:unionOf ( wno:Pump wno:Tank wno:Valve ) ] ; rdfs:range wno:Curve .
+wno:hasStatus a owl:ObjectProperty, owl:FunctionalProperty ; rdfs:domain wno:Link ; rdfs:range wno:OperationalStatus .
+wno:governedBy a owl:ObjectProperty ; rdfs:domain wno:Link ; rdfs:range [ owl:unionOf ( wno:SimpleControl wno:Rule ) ] .
+
+# Link equivalence (A.3): exactly one start node and one end node
+wno:Link owl:equivalentClass [ owl:intersectionOf ( wno:WaterNetworkElement
+    [ a owl:Restriction ; owl:onProperty wno:startsAt ; owl:qualifiedCardinality "1"^^xsd:nonNegativeInteger ; owl:onClass wno:Node ]
+    [ a owl:Restriction ; owl:onProperty wno:endsAt   ; owl:qualifiedCardinality "1"^^xsd:nonNegativeInteger ; owl:onClass wno:Node ] ) ] .
+
+# Pump cardinality (A.3): exactly one pump curve (power pumps are modelled without one; see README)
+wno:Pump rdfs:subClassOf [ a owl:Restriction ; owl:onProperty wno:hasCurve ;
+    owl:qualifiedCardinality "1"^^xsd:nonNegativeInteger ; owl:onClass wno:PumpCurve ] .
+
+# Network containment (A.3)
+wno:WaterNetwork rdfs:subClassOf
+    [ a owl:Restriction ; owl:onProperty wno:containsNode ; owl:minQualifiedCardinality "1"^^xsd:nonNegativeInteger ; owl:onClass wno:Node ] ,
+    [ a owl:Restriction ; owl:onProperty wno:containsLink ; owl:minQualifiedCardinality "1"^^xsd:nonNegativeInteger ; owl:onClass wno:Link ] .
+
+# Datatype properties (A.5); units via qudt:unit annotations
+wno:elevation  a owl:DatatypeProperty ; rdfs:domain wno:Node ; rdfs:range xsd:float ; qudt:unit unit:M .
+wno:baseDemand a owl:DatatypeProperty ; rdfs:domain wno:Junction ; rdfs:range xsd:float ; qudt:unit unit:L-PER-SEC .
+wno:emitterCoeff a owl:DatatypeProperty ; rdfs:domain wno:Junction ; rdfs:range xsd:float .
+wno:totalHead  a owl:DatatypeProperty ; rdfs:domain wno:Reservoir ; rdfs:range xsd:float ; qudt:unit unit:M .
+wno:initLevel  a owl:DatatypeProperty ; rdfs:domain wno:Tank ; rdfs:range xsd:float ; qudt:unit unit:M .
+wno:minLevel   a owl:DatatypeProperty ; rdfs:domain wno:Tank ; rdfs:range xsd:float ; qudt:unit unit:M .
+wno:maxLevel   a owl:DatatypeProperty ; rdfs:domain wno:Tank ; rdfs:range xsd:float ; qudt:unit unit:M .
+wno:nomDiameter a owl:DatatypeProperty ; rdfs:domain wno:Tank ; rdfs:range xsd:float ; qudt:unit unit:M .
+wno:minVolume  a owl:DatatypeProperty ; rdfs:domain wno:Tank ; rdfs:range xsd:float ; qudt:unit unit:M3 .
+wno:length     a owl:DatatypeProperty ; rdfs:domain wno:Pipe ; rdfs:range xsd:float ; qudt:unit unit:M .
+wno:diameter   a owl:DatatypeProperty ; rdfs:domain [ owl:unionOf ( wno:Pipe wno:Valve ) ] ; rdfs:range xsd:float ; qudt:unit unit:MilliM .
+wno:roughness  a owl:DatatypeProperty ; rdfs:domain wno:Pipe ; rdfs:range xsd:float ; rdfs:comment "Unit depends on wno:headlossFormula." .
+wno:minorLoss  a owl:DatatypeProperty ; rdfs:domain [ owl:unionOf ( wno:Pipe wno:Valve ) ] ; rdfs:range xsd:float .
+wno:valveSetting a owl:DatatypeProperty ; rdfs:domain wno:Valve ; rdfs:range xsd:float .
+wno:flowUnits  a owl:DatatypeProperty ; rdfs:domain wno:WaterNetwork ; rdfs:range xsd:string .
+wno:headlossFormula a owl:DatatypeProperty ; rdfs:domain wno:WaterNetwork ; rdfs:range xsd:string .
+wno:simDuration a owl:DatatypeProperty ; rdfs:domain wno:WaterNetwork ; rdfs:range xsd:float ; qudt:unit unit:HR .
+wno:hydraulicTimestep a owl:DatatypeProperty ; rdfs:domain wno:WaterNetwork ; rdfs:range xsd:float ; qudt:unit unit:SEC .
+# Used by CQ7, not listed in Table A.5
+wno:value  a owl:DatatypeProperty ; rdfs:domain wno:OperationalStatus ; rdfs:range xsd:string .
+wno:reason a owl:DatatypeProperty ; rdfs:domain wno:OperationalStatus ; rdfs:range xsd:string .
+
+#################################################################
+# ASSET LAYER (Section 3.2)
+#################################################################
+wno:AssetRecord      a owl:Class .
+wno:InspectionRecord a owl:Class .
+wno:FailureEvent     a owl:Class .
+wno:Burst            a owl:Class ; rdfs:subClassOf wno:FailureEvent .
+wno:JointFailure     a owl:Class ; rdfs:subClassOf wno:FailureEvent .
+wno:Corrosion        a owl:Class ; rdfs:subClassOf wno:FailureEvent .
+wno:ThirdPartyDamage a owl:Class ; rdfs:subClassOf wno:FailureEvent .
+[] a owl:AllDisjointClasses ; owl:members ( wno:Burst wno:JointFailure wno:Corrosion wno:ThirdPartyDamage ) .
+
+wno:hasAssetRecord a owl:ObjectProperty, owl:FunctionalProperty ; rdfs:domain wno:Link ; rdfs:range wno:AssetRecord .
+wno:experiencedFailure a owl:ObjectProperty ; rdfs:domain wno:Link ; rdfs:range wno:FailureEvent .
+wno:hasInspection a owl:ObjectProperty ; rdfs:domain wno:AssetRecord ; rdfs:range wno:InspectionRecord .
+
+wno:material         a owl:DatatypeProperty ; rdfs:domain wno:AssetRecord ; rdfs:range xsd:string .
+wno:nominalDiameter  a owl:DatatypeProperty ; rdfs:domain wno:AssetRecord ; rdfs:range xsd:float ; qudt:unit unit:MilliM .
+wno:installationYear a owl:DatatypeProperty ; rdfs:domain wno:AssetRecord ; rdfs:range xsd:integer .
+wno:age              a owl:DatatypeProperty ; rdfs:domain wno:AssetRecord ; rdfs:range xsd:integer ; qudt:unit unit:YR .
+wno:designLife       a owl:DatatypeProperty ; rdfs:domain wno:AssetRecord ; rdfs:range xsd:integer ; qudt:unit unit:YR .
+wno:liningType       a owl:DatatypeProperty ; rdfs:domain wno:AssetRecord ; rdfs:range xsd:string .
+wno:jointType        a owl:DatatypeProperty ; rdfs:domain wno:AssetRecord ; rdfs:range xsd:string .
+wno:soilCorrosivity  a owl:DatatypeProperty ; rdfs:domain wno:AssetRecord ; rdfs:range xsd:string .
+wno:conditionGrade   a owl:DatatypeProperty ; rdfs:range xsd:integer ; rdfs:comment "UKWIR-style 1 (very good) to 5 (very poor)." .
+wno:lastInspectionYear a owl:DatatypeProperty ; rdfs:domain wno:AssetRecord ; rdfs:range xsd:integer .
+wno:failureCount     a owl:DatatypeProperty ; rdfs:domain wno:AssetRecord ; rdfs:range xsd:integer .
+wno:failureMode      a owl:DatatypeProperty ; rdfs:domain wno:FailureEvent ; rdfs:range xsd:string .
+wno:year             a owl:DatatypeProperty ; rdfs:range xsd:integer .
+
+#################################################################
+# RISK LAYER (Section 3.3)
+#################################################################
+wno:RiskProfile          a owl:Class .
+wno:RiskIndicator        a owl:Class .
+wno:FailureProbability   a owl:Class ; rdfs:subClassOf wno:RiskIndicator .
+wno:HydraulicCriticality a owl:Class ; rdfs:subClassOf wno:RiskIndicator .
+wno:ServiceCriticality   a owl:Class ; rdfs:subClassOf wno:RiskIndicator .
+wno:OverallRisk          a owl:Class ; rdfs:subClassOf wno:RiskIndicator .
+wno:CriticalFacility     a owl:Class .
+
+wno:hasRiskProfile a owl:ObjectProperty, owl:FunctionalProperty ; rdfs:domain wno:Pipe ; rdfs:range wno:RiskProfile .
+wno:hasFailureProbability   a owl:ObjectProperty, owl:FunctionalProperty ; rdfs:domain wno:RiskProfile ; rdfs:range wno:FailureProbability .
+wno:hasHydraulicCriticality a owl:ObjectProperty, owl:FunctionalProperty ; rdfs:domain wno:RiskProfile ; rdfs:range wno:HydraulicCriticality .
+wno:hasServiceCriticality   a owl:ObjectProperty, owl:FunctionalProperty ; rdfs:domain wno:RiskProfile ; rdfs:range wno:ServiceCriticality .
+wno:hasOverallRisk          a owl:ObjectProperty, owl:FunctionalProperty ; rdfs:domain wno:RiskProfile ; rdfs:range wno:OverallRisk .
+wno:servesFacility a owl:ObjectProperty ; rdfs:domain wno:Junction ; rdfs:range wno:CriticalFacility .
+wno:band  a owl:DatatypeProperty ; rdfs:domain wno:RiskIndicator ; rdfs:range xsd:string .
+wno:level a owl:DatatypeProperty ; rdfs:domain wno:RiskIndicator ; rdfs:range xsd:integer .
+
+# Shared band individuals (the instance export names them FP_High, OR_Intolerable, ...)
+wno:OR_Negligible  a wno:OverallRisk ; wno:band "Negligible" ; wno:level 1 .
+wno:OR_Tolerable   a wno:OverallRisk ; wno:band "Tolerable" ; wno:level 2 .
+wno:OR_Significant a wno:OverallRisk ; wno:band "Significant" ; wno:level 3 .
+wno:OR_Intolerable a wno:OverallRisk ; wno:band "Intolerable" ; wno:level 4 .
+
+#################################################################
+# DECISION LAYER (Section 3.4)
+#################################################################
+wno:MaintenanceAction    a owl:Class .
+wno:Inspection     a owl:Class ; rdfs:subClassOf wno:MaintenanceAction .
+wno:Repair         a owl:Class ; rdfs:subClassOf wno:MaintenanceAction .
+wno:Rehabilitation a owl:Class ; rdfs:subClassOf wno:MaintenanceAction .
+wno:Replacement    a owl:Class ; rdfs:subClassOf wno:MaintenanceAction .
+wno:Monitor        a owl:Class ; rdfs:subClassOf wno:MaintenanceAction ; rdfs:comment "No intervention; routine monitoring." .
+wno:EngineeringGuideline a owl:Class .
+wno:DecisionRecord       a owl:Class .
+
+wno:concerns    a owl:ObjectProperty, owl:FunctionalProperty ; rdfs:domain wno:DecisionRecord ; rdfs:range wno:Link .
+wno:recommends  a owl:ObjectProperty, owl:FunctionalProperty ; rdfs:domain wno:DecisionRecord ; rdfs:range wno:MaintenanceAction .
+wno:supportedBy a owl:ObjectProperty ; rdfs:domain wno:DecisionRecord ; rdfs:range wno:EngineeringGuideline .
+wno:basedOn     a owl:ObjectProperty ; rdfs:domain wno:DecisionRecord ; rdfs:range [ owl:unionOf ( wno:AssetRecord wno:RiskProfile ) ] .
+
+# Every decision must be authorised by at least one guideline (traceability requirement)
+wno:DecisionRecord rdfs:subClassOf [ a owl:Restriction ; owl:onProperty wno:supportedBy ;
+    owl:minQualifiedCardinality "1"^^xsd:nonNegativeInteger ; owl:onClass wno:EngineeringGuideline ] .
+
+wno:rule a owl:DatatypeProperty ; rdfs:domain wno:DecisionRecord ; rdfs:range xsd:string .
+wno:framework a owl:DatatypeProperty ; rdfs:domain wno:EngineeringGuideline ; rdfs:range xsd:string .
+wno:text a owl:DatatypeProperty ; rdfs:range xsd:string .
+wno:Hospital a owl:Class ; rdfs:subClassOf wno:CriticalFacility .
+wno:School   a owl:Class ; rdfs:subClassOf wno:CriticalFacility .
+wno:CareHome a owl:Class ; rdfs:subClassOf wno:CriticalFacility .
+
+#################################################################
+# INSTRUMENTATION AND SUPPLY ZONES (added for L-TOWN-style models)
+#################################################################
+# Sensors are aligned with SOSA so WaterOnt can link to SOSA/SSN observation data
+wno:Sensor         a owl:Class ; rdfs:subClassOf sosa:Sensor ;
+    rdfs:comment "Instrument attached to a network element; parsed from .inp element annotations." .
+wno:PressureSensor a owl:Class ; rdfs:subClassOf wno:Sensor .
+wno:FlowSensor     a owl:Class ; rdfs:subClassOf wno:Sensor .
+wno:LevelSensor    a owl:Class ; rdfs:subClassOf wno:Sensor .
+wno:AMRMeter       a owl:Class ; rdfs:subClassOf wno:Sensor ; rdfs:comment "Automated meter reading at a customer node." .
+wno:observedBy a owl:ObjectProperty ; rdfs:domain wno:WaterNetworkElement ; rdfs:range wno:Sensor .
+wno:observedProperty a owl:DatatypeProperty ; rdfs:domain wno:Sensor ; rdfs:range xsd:string .
+
+wno:PressureZone a owl:Class ;
+    rdfs:comment "Hydraulic supply zone: connected component after removing pumps and control valves." .
+wno:hasZone   a owl:ObjectProperty ; rdfs:domain wno:WaterNetwork ; rdfs:range wno:PressureZone .
+wno:inZone    a owl:ObjectProperty, owl:FunctionalProperty ; rdfs:domain wno:WaterNetworkElement ; rdfs:range wno:PressureZone .
+wno:feedsZone a owl:ObjectProperty ; rdfs:domain [ owl:unionOf ( wno:Pump wno:Valve ) ] ; rdfs:range wno:PressureZone .
+wno:isSupplyZone a owl:DatatypeProperty ; rdfs:domain wno:PressureZone ; rdfs:range xsd:boolean .
+wno:containsStorage a owl:DatatypeProperty ; rdfs:domain wno:PressureZone ; rdfs:range xsd:boolean .
+
+wno:MonitoringStatus a owl:Class ; rdfs:subClassOf wno:RiskIndicator ;
+    rdfs:comment "Monitored if a pressure sensor lies within two segments of the pipe." .
+wno:hasMonitoringStatus a owl:ObjectProperty, owl:FunctionalProperty ; rdfs:domain wno:RiskProfile ; rdfs:range wno:MonitoringStatus .
+wno:failureProbabilityPerKm a owl:DatatypeProperty ; rdfs:domain wno:RiskProfile ; rdfs:range xsd:float ;
+    rdfs:comment "Banding basis: independent of how the hydraulic model segments mains." .
+wno:materialSource a owl:DatatypeProperty ; rdfs:domain wno:AssetRecord ; rdfs:range xsd:string ;
+    rdfs:comment "Provenance: register | model-hint:<evidence> | prior." .
+wno:IndustrialCustomer a owl:Class ; rdfs:subClassOf wno:CriticalFacility ;
+    rdfs:comment "Junction with an industrial demand category in the hydraulic model." .

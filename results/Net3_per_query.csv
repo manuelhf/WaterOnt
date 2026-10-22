@@ -1,0 +1,55 @@
+system,intent,paraphrase,query,n_ref,n_pred,decision_precision,decision_recall,decision_f1,policy_recall,traceability,unsupported_citations,evidence_consistency
+WaterOnt GraphRAG,replacement,0,"Which pipes should be replaced, and which standard authorises each replacement?",10,10,1.0,1.0,1.0,1.0,1.0,0,0.6222222222222222
+WaterOnt GraphRAG,replacement,1,List the mains recommended for renewal together with the supporting policy.,10,10,1.0,1.0,1.0,1.0,1.0,0,0.6222222222222222
+WaterOnt GraphRAG,replacement,2,Which assets have reached the end of their life and need to be swapped out?,10,24,0.4166666666666667,1.0,0.5882352941176471,1.0,1.0,0,0.6222222222222222
+Flat-document RAG,replacement,0,"Which pipes should be replaced, and which standard authorises each replacement?",10,0,0.0,0.0,0.0,0.0,,0,0.3333333333333333
+Flat-document RAG,replacement,1,List the mains recommended for renewal together with the supporting policy.,10,0,0.0,0.0,0.0,0.0,,0,0.3333333333333333
+Flat-document RAG,replacement,2,Which assets have reached the end of their life and need to be swapped out?,10,25,0.0,0.0,0.0,0.0,0.0,0,0.3333333333333333
+ML (GBM rank),replacement,0,"Which pipes should be replaced, and which standard authorises each replacement?",10,10,0.2,0.2,0.20000000000000004,0.0,0.0,0,0.6
+ML (GBM rank),replacement,1,List the mains recommended for renewal together with the supporting policy.,10,10,0.2,0.2,0.20000000000000004,0.0,0.0,0,0.6
+ML (GBM rank),replacement,2,Which assets have reached the end of their life and need to be swapped out?,10,25,0.08,0.2,0.11428571428571428,0.0,0.0,0,0.6
+WaterOnt GraphRAG,rehabilitation,0,Which mains are candidates for rehabilitation?,21,21,1.0,1.0,1.0,1.0,1.0,0,0.6761904761904761
+WaterOnt GraphRAG,rehabilitation,1,Which deteriorated pipes should be relined rather than replaced?,21,25,0.6,0.7142857142857143,0.6521739130434783,0.7142857142857143,1.0,0,0.6761904761904761
+WaterOnt GraphRAG,rehabilitation,2,Where should we carry out structural rehabilitation this period?,21,21,1.0,1.0,1.0,1.0,1.0,0,0.6761904761904761
+Flat-document RAG,rehabilitation,0,Which mains are candidates for rehabilitation?,21,0,0.0,0.0,0.0,0.0,,0,1.0
+Flat-document RAG,rehabilitation,1,Which deteriorated pipes should be relined rather than replaced?,21,0,0.0,0.0,0.0,0.0,,0,1.0
+Flat-document RAG,rehabilitation,2,Where should we carry out structural rehabilitation this period?,21,0,0.0,0.0,0.0,0.0,,0,1.0
+ML (GBM rank),rehabilitation,0,Which mains are candidates for rehabilitation?,21,21,0.3333333333333333,0.3333333333333333,0.3333333333333333,0.0,0.0,0,0.6559139784946236
+ML (GBM rank),rehabilitation,1,Which deteriorated pipes should be relined rather than replaced?,21,25,0.24,0.2857142857142857,0.2608695652173913,0.0,0.0,0,0.6559139784946236
+ML (GBM rank),rehabilitation,2,Where should we carry out structural rehabilitation this period?,21,21,0.3333333333333333,0.3333333333333333,0.3333333333333333,0.0,0.0,0,0.6559139784946236
+WaterOnt GraphRAG,inspection,0,Which pipes need an inspection?,23,23,1.0,1.0,1.0,1.0,1.0,0,1.0
+WaterOnt GraphRAG,inspection,1,Which mains are overdue for a condition survey?,23,23,1.0,1.0,1.0,1.0,1.0,0,1.0
+WaterOnt GraphRAG,inspection,2,Where should condition assessment crews be sent next?,23,23,1.0,1.0,1.0,1.0,1.0,0,1.0
+Flat-document RAG,inspection,0,Which pipes need an inspection?,23,0,0.0,0.0,0.0,0.0,,0,0.3333333333333333
+Flat-document RAG,inspection,1,Which mains are overdue for a condition survey?,23,7,0.14285714285714285,0.043478260869565216,0.06666666666666667,0.043478260869565216,0.0,0,0.3333333333333333
+Flat-document RAG,inspection,2,Where should condition assessment crews be sent next?,23,7,0.14285714285714285,0.043478260869565216,0.06666666666666667,0.043478260869565216,0.0,0,0.3333333333333333
+ML (GBM rank),inspection,0,Which pipes need an inspection?,23,23,0.17391304347826086,0.17391304347826086,0.17391304347826086,0.0,0.0,0,1.0
+ML (GBM rank),inspection,1,Which mains are overdue for a condition survey?,23,23,0.17391304347826086,0.17391304347826086,0.17391304347826086,0.0,0.0,0,1.0
+ML (GBM rank),inspection,2,Where should condition assessment crews be sent next?,23,23,0.17391304347826086,0.17391304347826086,0.17391304347826086,0.0,0.0,0,1.0
+WaterOnt GraphRAG,critical_high_pof,0,Which hydraulically critical pipes also have a high failure probability?,8,8,1.0,1.0,1.0,1.0,1.0,0,1.0
+WaterOnt GraphRAG,critical_high_pof,1,Show backbone mains that are likely to fail.,8,8,1.0,1.0,1.0,1.0,1.0,0,1.0
+WaterOnt GraphRAG,critical_high_pof,2,Find bottleneck pipes with a high or very high probability of failure.,8,8,1.0,1.0,1.0,1.0,1.0,0,1.0
+Flat-document RAG,critical_high_pof,0,Which hydraulically critical pipes also have a high failure probability?,8,25,0.0,0.0,0.0,0.0,0.0,0,0.04
+Flat-document RAG,critical_high_pof,1,Show backbone mains that are likely to fail.,8,0,0.0,0.0,0.0,0.0,,0,0.04
+Flat-document RAG,critical_high_pof,2,Find bottleneck pipes with a high or very high probability of failure.,8,25,0.12,0.375,0.18181818181818182,0.16666666666666666,0.0,0,0.04
+ML (GBM rank),critical_high_pof,0,Which hydraulically critical pipes also have a high failure probability?,8,25,0.04,0.125,0.06060606060606061,0.0,0.0,0,1.0
+ML (GBM rank),critical_high_pof,1,Show backbone mains that are likely to fail.,8,25,0.04,0.125,0.06060606060606061,0.0,0.0,0,1.0
+ML (GBM rank),critical_high_pof,2,Find bottleneck pipes with a high or very high probability of failure.,8,25,0.04,0.125,0.06060606060606061,0.0,0.0,0,1.0
+WaterOnt GraphRAG,critical_customers,0,"Which mains serving hospitals, schools or care homes need intervention?",11,11,1.0,1.0,1.0,1.0,1.0,0,1.0
+WaterOnt GraphRAG,critical_customers,1,Which pipes supplying critical customers should be prioritised?,11,11,1.0,1.0,1.0,1.0,1.0,0,1.0
+WaterOnt GraphRAG,critical_customers,2,Do any pipes feeding schools or hospitals require work?,11,11,1.0,1.0,1.0,1.0,1.0,0,1.0
+Flat-document RAG,critical_customers,0,"Which mains serving hospitals, schools or care homes need intervention?",11,0,0.0,0.0,0.0,0.0,,0,0.3333333333333333
+Flat-document RAG,critical_customers,1,Which pipes supplying critical customers should be prioritised?,11,25,0.0,0.0,0.0,0.0,0.0,0,0.3333333333333333
+Flat-document RAG,critical_customers,2,Do any pipes feeding schools or hospitals require work?,11,0,0.0,0.0,0.0,0.0,,0,0.3333333333333333
+ML (GBM rank),critical_customers,0,"Which mains serving hospitals, schools or care homes need intervention?",11,25,0.08,0.18181818181818182,0.1111111111111111,0.0,0.0,0,1.0
+ML (GBM rank),critical_customers,1,Which pipes supplying critical customers should be prioritised?,11,25,0.08,0.18181818181818182,0.1111111111111111,0.0,0.0,0,1.0
+ML (GBM rank),critical_customers,2,Do any pipes feeding schools or hospitals require work?,11,25,0.08,0.18181818181818182,0.1111111111111111,0.0,0.0,0,1.0
+WaterOnt GraphRAG,multimodal_pressure_age_policy,0,Which cast iron mains at low service pressure need intervention?,8,8,1.0,1.0,1.0,1.0,1.0,0,1.0
+WaterOnt GraphRAG,multimodal_pressure_age_policy,1,Prioritise cast iron pipes with a low pressure margin.,8,8,1.0,1.0,1.0,1.0,1.0,0,1.0
+WaterOnt GraphRAG,multimodal_pressure_age_policy,2,Which old cast iron pipes with a pressure deficit require attention?,8,8,1.0,1.0,1.0,1.0,1.0,0,1.0
+Flat-document RAG,multimodal_pressure_age_policy,0,Which cast iron mains at low service pressure need intervention?,8,25,0.0,0.0,0.0,0.0,0.0,0,0.38051320660016313
+Flat-document RAG,multimodal_pressure_age_policy,1,Prioritise cast iron pipes with a low pressure margin.,8,25,0.0,0.0,0.0,0.0,0.0,0,0.38051320660016313
+Flat-document RAG,multimodal_pressure_age_policy,2,Which old cast iron pipes with a pressure deficit require attention?,8,25,0.0,0.0,0.0,0.0,0.0,0,0.38051320660016313
+ML (GBM rank),multimodal_pressure_age_policy,0,Which cast iron mains at low service pressure need intervention?,8,25,0.12,0.375,0.18181818181818182,0.0,0.0,0,1.0
+ML (GBM rank),multimodal_pressure_age_policy,1,Prioritise cast iron pipes with a low pressure margin.,8,25,0.12,0.375,0.18181818181818182,0.0,0.0,0,1.0
+ML (GBM rank),multimodal_pressure_age_policy,2,Which old cast iron pipes with a pressure deficit require attention?,8,25,0.12,0.375,0.18181818181818182,0.0,0.0,0,1.0

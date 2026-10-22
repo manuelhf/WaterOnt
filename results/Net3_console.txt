@@ -1,0 +1,33 @@
+[physical] 117 pipes, 97 nodes, 0 sensors, supply zones: ['10+335+1+2+3+River']
+[asset]    material provenance: {'prior': 116, 'model-hint:HW-C110': 1}
+[asset]    117 asset records, 44 failure events
+[risk]     overall risk: {'Tolerable': 41, 'Significant': 28, 'Negligible': 25, 'Intolerable': 23}
+[decision] {'Monitor': 63, 'Inspection': 23, 'Rehabilitation': 21, 'Replacement': 10}
+[ml] out-of-fold AUC on synthetic horizon failures: 0.684
+                                                  n_ref  decision_f1  policy_recall  evidence_consistency
+intent                         system                                                                    
+critical_customers             Flat-document RAG   11.0        0.000          0.000                 0.333
+                               ML (GBM rank)       11.0        0.111          0.000                 1.000
+                               WaterOnt GraphRAG   11.0        1.000          1.000                 1.000
+critical_high_pof              Flat-document RAG    8.0        0.061          0.056                 0.040
+                               ML (GBM rank)        8.0        0.061          0.000                 1.000
+                               WaterOnt GraphRAG    8.0        1.000          1.000                 1.000
+inspection                     Flat-document RAG   23.0        0.044          0.029                 0.333
+                               ML (GBM rank)       23.0        0.174          0.000                 1.000
+                               WaterOnt GraphRAG   23.0        1.000          1.000                 1.000
+multimodal_pressure_age_policy Flat-document RAG    8.0        0.000          0.000                 0.381
+                               ML (GBM rank)        8.0        0.182          0.000                 1.000
+                               WaterOnt GraphRAG    8.0        1.000          1.000                 1.000
+rehabilitation                 Flat-document RAG   21.0        0.000          0.000                 1.000
+                               ML (GBM rank)       21.0        0.309          0.000                 0.656
+                               WaterOnt GraphRAG   21.0        0.884          0.905                 0.676
+replacement                    Flat-document RAG   10.0        0.000          0.000                 0.333
+                               ML (GBM rank)       10.0        0.171          0.000                 0.600
+                               WaterOnt GraphRAG   10.0        0.863          1.000                 0.622
+
+SUMMARY
+                    decision_f1  policy_recall  traceability  unsupported_citations  evidence_consistency
+system                                                                                                  
+WaterOnt GraphRAG        0.958          0.984           1.0                    0.0                 0.883
+Flat-document RAG        0.018          0.014           0.0                    0.0                 0.403
+ML (GBM rank)            0.168          0.000           0.0                    0.0                 0.876

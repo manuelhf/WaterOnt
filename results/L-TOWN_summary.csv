@@ -1,0 +1,4 @@
+system,decision_f1,policy_recall,traceability,unsupported_citations,evidence_consistency
+WaterOnt GraphRAG,0.9371428571428572,0.9550000000000001,1.0,0.0,0.862281822051937
+Flat-document RAG,0.01,0.009970760233918128,0.0,0.0,0.3914506371288286
+ML (GBM rank),0.049999999999999996,0.0,0.0,0.0,0.9166666666666666

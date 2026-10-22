@@ -1,0 +1,767 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>WaterOnt explorer</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Public+Sans:ital,wght@0,400;0,500;0,600;0,700;1,400&display=swap" rel="stylesheet">
+<style>
+:root {
+  box-sizing: border-box;
+  padding-top: env(safe-area-inset-top, 0px);
+  padding-bottom: env(safe-area-inset-bottom, 0px);
+  color-scheme: light;
+  --bg: #EEF2F1; --surface: #F8FAF9; --surface-2: #E3E9E7; --ink: #1B2A33; --ink-2: #4A5A63;
+  --line: #C9D3D1; --pipe: #A3AFB3; --accent: #1F6F8B; --accent-ink: #FFFFFF; --focus: #1F6F8B;
+  --r-neg: #7FAE9F; --r-tol: #C9AE45; --r-sig: #D97A28; --r-int: #A8231C;
+  --a-mon: #A3AFB3; --a-insp: #2F6FB0; --a-rehab: #7A4FB5; --a-repl: #A8231C;
+  --dim: 0.18; --shadow: 0 1px 0 rgba(27,42,51,.06);
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    color-scheme: dark;
+    --bg: #0F1A20; --surface: #15232B; --surface-2: #1D2F38; --ink: #E3ECEE; --ink-2: #9FB1B8;
+    --line: #2B414B; --pipe: #4F646D; --accent: #5FB3CF; --accent-ink: #0F1A20; --focus: #5FB3CF;
+    --r-neg: #5E9585; --r-tol: #CDB24E; --r-sig: #E98A3A; --r-int: #E0574D;
+    --a-mon: #4F646D; --a-insp: #5B9BE0; --a-rehab: #A884E0; --a-repl: #E0574D;
+    --dim: 0.16; --shadow: none;
+  }
+}
+:root[data-theme="dark"] {
+  color-scheme: dark;
+  --bg: #0F1A20; --surface: #15232B; --surface-2: #1D2F38; --ink: #E3ECEE; --ink-2: #9FB1B8;
+  --line: #2B414B; --pipe: #4F646D; --accent: #5FB3CF; --accent-ink: #0F1A20; --focus: #5FB3CF;
+  --r-neg: #5E9585; --r-tol: #CDB24E; --r-sig: #E98A3A; --r-int: #E0574D;
+  --a-mon: #4F646D; --a-insp: #5B9BE0; --a-rehab: #A884E0; --a-repl: #E0574D;
+  --dim: 0.16; --shadow: none;
+}
+*, *::before, *::after { box-sizing: inherit; }
+html { height: 100%; scroll-padding-top: env(safe-area-inset-top, 0px); }
+body {
+  margin: 0; height: 100%; background: var(--bg); color: var(--ink);
+  font: 15px/1.5 "Public Sans", system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+  font-variant-numeric: tabular-nums;
+}
+button, input, select { font: inherit; color: inherit; }
+:focus-visible { outline: 2px solid var(--focus); outline-offset: 2px; }
+
+.app { display: grid; grid-template-columns: minmax(0, 1fr) 400px; grid-template-rows: auto minmax(0, 1fr); height: 100%; }
+header.bar {
+  grid-column: 1 / -1; display: flex; flex-wrap: wrap; align-items: center; gap: 12px 20px;
+  padding: 12px 20px; border-bottom: 1px solid var(--line); background: var(--surface);
+}
+.brand { display: flex; align-items: baseline; gap: 10px; margin-right: auto; }
+.brand h1 { font-size: 19px; font-weight: 700; letter-spacing: -0.01em; margin: 0; }
+.brand span { color: var(--ink-2); font-size: 14px; }
+.bar label { font-size: 14px; color: var(--ink-2); display: flex; align-items: center; gap: 8px; }
+.bar select { background: var(--bg); border: 1px solid var(--line); border-radius: 6px; padding: 5px 8px; }
+
+#loadStatus { flex-basis: 100%; font-size: 13px; color: var(--ink-2); }
+#loadStatus:empty { display: none; }
+body.dropping .mapwrap { outline: 3px dashed var(--accent); outline-offset: -8px; }
+.mapwrap { position: relative; min-height: 0; overflow: hidden; touch-action: none; }
+svg#map { width: 100%; height: 100%; display: block; cursor: grab; user-select: none; }
+svg#map.dragging { cursor: grabbing; }
+svg#map line { stroke-linecap: round; vector-effect: non-scaling-stroke; transition: opacity .2s; }
+svg#map .dimmed { opacity: var(--dim); }
+.legend {
+  position: absolute; left: 16px; bottom: 16px; background: var(--surface); border: 1px solid var(--line);
+  border-radius: 8px; padding: 10px 12px; font-size: 13px; max-width: calc(100% - 32px); box-shadow: var(--shadow);
+}
+.legend ul { list-style: none; margin: 0; padding: 0; display: grid; gap: 3px; }
+.legend li { display: flex; align-items: center; gap: 8px; }
+.legend i { width: 18px; height: 4px; border-radius: 2px; display: inline-block; }
+.legend .note { color: var(--ink-2); margin-top: 6px; font-size: 12px; }
+.legend .clear { border: 0; background: none; color: var(--accent); text-decoration: underline; cursor: pointer; padding: 0 0 0 4px; font-size: 12px; }
+.zoom { position: absolute; right: 16px; top: 16px; display: grid; gap: 4px; }
+.zoom button {
+  width: 34px; height: 34px; border-radius: 8px; border: 1px solid var(--line); background: var(--surface);
+  cursor: pointer; font-size: 17px; line-height: 1;
+}
+.tip {
+  position: absolute; pointer-events: none; background: var(--ink); color: var(--bg); font-size: 12px;
+  padding: 4px 7px; border-radius: 5px; transform: translate(10px, -130%); white-space: nowrap; display: none;
+}
+
+aside.panel { border-left: 1px solid var(--line); background: var(--surface); display: flex; flex-direction: column; min-height: 0; }
+.tabs { display: flex; border-bottom: 1px solid var(--line); }
+.tabs button {
+  flex: 1; padding: 11px 6px; background: none; border: 0; border-bottom: 3px solid transparent; cursor: pointer;
+  font-weight: 600; color: var(--ink-2);
+}
+.tabs button[aria-selected="true"] { color: var(--ink); border-bottom-color: var(--accent); }
+.pane { padding: 18px 20px 28px; overflow-y: auto; min-height: 0; flex: 1; }
+.pane[hidden] { display: none; }
+.pane h2 { font-size: 16px; margin: 0 0 4px; }
+.pane p.lead { margin: 0 0 14px; color: var(--ink-2); font-size: 14px; }
+
+form.ask { display: flex; gap: 8px; }
+form.ask input {
+  flex: 1; min-width: 0; padding: 9px 11px; border: 1px solid var(--line); border-radius: 8px; background: var(--bg);
+}
+.btn {
+  padding: 9px 14px; border-radius: 8px; border: 1px solid var(--accent); background: var(--accent);
+  color: var(--accent-ink); font-weight: 600; cursor: pointer;
+}
+.btn.quiet { background: none; color: var(--ink); border-color: var(--line); }
+.examples { display: flex; flex-wrap: wrap; gap: 6px; margin: 12px 0 4px; }
+.examples[hidden] { display: none; }
+.examples button {
+  border: 1px solid var(--line); background: var(--bg); border-radius: 999px; padding: 4px 10px;
+  font-size: 13px; cursor: pointer; text-align: left;
+}
+.understood { margin: 14px 0 8px; font-size: 13px; color: var(--ink-2); }
+.understood b { color: var(--ink); font-weight: 600; }
+.chip {
+  display: inline-block; border-radius: 4px; padding: 0 6px; margin: 1px 2px; font-size: 12.5px;
+  background: var(--surface-2); border: 0; cursor: pointer;
+}
+ol.results { margin: 0; padding: 0; list-style: none; display: grid; gap: 8px; }
+ol.results > li { background: var(--bg); border: 1px solid var(--line); border-radius: 8px; padding: 9px 11px; }
+ol.results > li:hover { border-color: var(--accent); }
+button.rhead { all: unset; display: grid; gap: 2px; cursor: pointer; width: 100%; }
+button.rhead:focus-visible { outline: 2px solid var(--focus); outline-offset: 4px; border-radius: 4px; }
+.cites { margin-top: 4px; font-size: 12.5px; color: var(--ink-2); }
+.rtitle { display: flex; align-items: center; gap: 8px; font-weight: 600; }
+.why { font-size: 13px; color: var(--ink-2); }
+.act { font-size: 12px; font-weight: 600; padding: 1px 7px; border-radius: 4px; color: #fff; }
+.act.Replacement { background: var(--a-repl); } .act.Rehabilitation { background: var(--a-rehab); }
+.act.Inspection { background: var(--a-insp); } .act.Monitor { background: var(--a-mon); color: var(--ink); }
+.empty { color: var(--ink-2); font-size: 14px; border: 1px dashed var(--line); border-radius: 8px; padding: 12px; }
+
+.find { display: flex; gap: 8px; margin-bottom: 16px; }
+.find input { flex: 1; min-width: 0; padding: 8px 10px; border: 1px solid var(--line); border-radius: 8px; background: var(--bg); }
+.trail { margin: 0; padding: 0; list-style: none; position: relative; }
+.trail::before { content: ""; position: absolute; left: 7px; top: 8px; bottom: 8px; width: 2px; background: var(--line); }
+.trail > li { position: relative; padding-left: 26px; margin-bottom: 14px; }
+.trail > li::before {
+  content: ""; position: absolute; left: 2px; top: 6px; width: 12px; height: 12px; border-radius: 50%;
+  background: var(--surface); border: 2px solid var(--accent);
+}
+.rel { font-size: 12px; color: var(--ink-2); font-style: italic; }
+.node { font-weight: 700; }
+dl.facts { display: grid; grid-template-columns: auto 1fr; gap: 2px 12px; margin: 6px 0 0; font-size: 13.5px; }
+dl.facts dt { color: var(--ink-2); }
+dl.facts dd { margin: 0; }
+.flag { color: var(--r-int); font-weight: 600; }
+.gl { background: var(--bg); border: 1px solid var(--line); border-radius: 8px; padding: 9px 11px; margin-top: 6px; font-size: 13.5px; }
+.gl b { display: block; }
+.changed { background: var(--surface-2); border-radius: 8px; padding: 8px 10px; font-size: 13.5px; margin-bottom: 14px; }
+
+fieldset { border: 0; padding: 0; margin: 0 0 18px; }
+legend { font-weight: 700; margin-bottom: 6px; padding: 0; }
+.row { display: grid; grid-template-columns: 1fr 110px 44px; align-items: center; gap: 8px; font-size: 14px; margin: 4px 0; }
+.row input[type=range] { width: 100%; accent-color: var(--accent); }
+.row output { text-align: right; }
+.grid2 { display: grid; grid-template-columns: repeat(3, 1fr); gap: 6px 10px; font-size: 14px; align-items: end; }
+.grid2 label { display: grid; gap: 2px; color: var(--ink-2); }
+.grid2 input { width: 100%; padding: 5px 7px; border: 1px solid var(--line); border-radius: 6px; background: var(--bg); color: var(--ink); }
+.check { display: flex; gap: 8px; align-items: flex-start; font-size: 14px; }
+table.counts { width: 100%; border-collapse: collapse; font-size: 14px; margin: 4px 0 12px; }
+table.counts th, table.counts td { text-align: right; padding: 4px 6px; border-bottom: 1px solid var(--line); }
+table.counts th:first-child, table.counts td:first-child { text-align: left; }
+.up { color: var(--r-int); } .down { color: var(--a-insp); }
+footer.note { font-size: 12.5px; color: var(--ink-2); padding: 12px 20px; border-top: 1px solid var(--line); }
+
+@media (max-width: 860px) {
+  .app { grid-template-columns: 1fr; grid-template-rows: auto 54vh auto; height: auto; min-height: 100%; }
+  aside.panel { border-left: 0; border-top: 1px solid var(--line); }
+  .pane { overflow: visible; }
+  .legend { font-size: 12px; padding: 6px 8px; left: 8px; bottom: 8px; max-width: calc(100% - 64px); }
+  .legend ul { display: flex; flex-wrap: wrap; gap: 2px 10px; }
+  .legend .note.hint { display: none; }
+}
+@media (prefers-reduced-motion: reduce) { svg#map line { transition: none; } }
+</style>
+</head>
+<body>
+<div class="app">
+  <header class="bar">
+    <div class="brand"><h1>WaterOnt explorer</h1><span id="netlabel"></span></div>
+    <label>Colour pipes by
+      <select id="colorBy">
+        <option value="overall">Overall risk</option>
+        <option value="action">Recommended action</option>
+        <option value="pof">Failure probability per km</option>
+        <option value="hyd">Hydraulic criticality</option>
+        <option value="svc">Service criticality</option>
+        <option value="mon">Pressure monitoring</option>
+        <option value="zone">Supply zone</option>
+        <option value="mat">Material</option>
+      </select>
+    </label>
+    <label><input type="checkbox" id="showSensors" checked> Show sensors</label>
+    <button class="btn quiet" id="openBtn" type="button" title="Open a network exported from Python or Colab. The file stays on your computer.">Open network…</button>
+    <input type="file" id="openFile" accept=".json,application/json" hidden>
+    <span id="loadStatus" role="status" aria-live="polite"></span>
+  </header>
+
+  <div class="mapwrap" id="mapwrap">
+    <svg id="map" role="img" aria-label="Network map; select a pipe to see its audit trail">
+      <g id="gPipes"></g><g id="gDevices"></g><g id="gSensors"></g><g id="gNodes"></g><g id="gSel"></g>
+    </svg>
+    <div class="zoom">
+      <button id="zin" aria-label="Zoom in">+</button>
+      <button id="zout" aria-label="Zoom out">−</button>
+      <button id="zreset" aria-label="Fit network to view">⤢</button>
+    </div>
+    <div class="legend" id="legend"></div>
+    <div class="tip" id="tip"></div>
+  </div>
+
+  <aside class="panel">
+    <div class="tabs" role="tablist">
+      <button role="tab" id="tab-ask" aria-selected="true" aria-controls="pane-ask">Ask</button>
+      <button role="tab" id="tab-pipe" aria-selected="false" aria-controls="pane-pipe">Pipe</button>
+      <button role="tab" id="tab-policy" aria-selected="false" aria-controls="pane-policy">Policy</button>
+    </div>
+
+    <section class="pane" id="pane-ask" role="tabpanel">
+      <h2>Ask the knowledge graph</h2>
+      <p class="lead">Questions are turned into graph filters, so every answer lists the pipes, the rule applied and the policy clauses that authorise it.</p>
+      <form class="ask" id="askForm">
+        <input id="q" type="text" placeholder="Which pipes should be replaced?" aria-label="Question">
+        <button class="btn" type="submit">Ask</button>
+      </form>
+      <div class="examples" id="examples"></div>
+      <button class="chip" id="moreEx" type="button" hidden style="margin-top:10px">Show example questions</button>
+      <div id="answer"></div>
+    </section>
+
+    <section class="pane" id="pane-pipe" role="tabpanel" hidden>
+      <form class="find" id="findForm">
+        <input id="findId" type="text" placeholder="Pipe id, e.g. p257" aria-label="Pipe id">
+        <button class="btn quiet" type="submit">Show</button>
+      </form>
+      <div id="pipeDetail"><p class="empty">Select a pipe on the map, or type its id, to follow its evidence from the asset record to the clause that authorises the recommendation.</p></div>
+    </section>
+
+    <section class="pane" id="pane-policy" role="tabpanel" hidden>
+      <h2>Policy sandbox</h2>
+      <p class="lead">Change the utility’s policy and every decision is recomputed from the same graph facts. Totals are compared with the published default policy.</p>
+      <table class="counts" id="counts"></table>
+      <fieldset>
+        <legend>Failure-probability bands (per km, planning horizon)</legend>
+        <div class="row"><span>Low below</span><input type="range" id="b0" min="0.05" max="0.6" step="0.01"><output id="o0"></output></div>
+        <div class="row"><span>Medium below</span><input type="range" id="b1" min="0.05" max="0.8" step="0.01"><output id="o1"></output></div>
+        <div class="row"><span>High below</span><input type="range" id="b2" min="0.05" max="0.95" step="0.01"><output id="o2"></output></div>
+      </fieldset>
+      <fieldset>
+        <legend>Design life by material (years)</legend>
+        <div class="grid2" id="lifeInputs"></div>
+      </fieldset>
+      <fieldset>
+        <legend>Inspection interval by overall risk (years)</legend>
+        <div class="grid2" id="inspInputs"></div>
+      </fieldset>
+      <fieldset>
+        <label class="check"><input type="checkbox" id="r5"> Inspect critical, high-risk mains with no pressure sensor within two segments (rule R5)</label>
+      </fieldset>
+      <button class="btn quiet" id="resetPolicy" type="button">Restore default policy</button>
+    </section>
+    <footer class="note" id="footnote"></footer>
+  </aside>
+</div>
+
+<script>
+const DATA = /*__WATERONT_DATA__*/null;
+
+// LOGIC START: mirrors wateront/risk.py, decision.py and graphrag.plan_rules
+const LEVEL = { Low: 1, Medium: 2, High: 3, VeryHigh: 4, Critical: 4 };
+const ACTIONS = ["Replacement", "Rehabilitation", "Inspection", "Monitor"];
+const ACTION_RANK = { Replacement: 0, Rehabilitation: 1, Inspection: 2, Monitor: 3 };
+
+function defaultPolicy(cfg) {
+  return { pofBands: cfg.pofBands.slice(), designLife: { ...cfg.designLife },
+           inspectionInterval: { ...cfg.inspectionInterval }, r5: true,
+           referenceYear: cfg.referenceYear };
+}
+function pofBand(v, t) { return v < t[0] ? "Low" : v < t[1] ? "Medium" : v < t[2] ? "High" : "VeryHigh"; }
+function overallCategory(p, c) {
+  const s = p * c;
+  return s <= 2 ? "Negligible" : s <= 4 ? "Tolerable" : s <= 8 ? "Significant" : "Intolerable";
+}
+function decide(pipe, pol) {
+  const band = pofBand(pipe.pofKm, pol.pofBands);
+  const p = LEVEL[band], c = Math.max(LEVEL[pipe.hyd], LEVEL[pipe.svc]);
+  const overall = overallCategory(p, c);
+  const priority = p * c + pipe.pofKm * Math.max(pipe.hScore, pipe.sScore);
+  const life = pol.designLife[pipe.mat];
+  const overdue = (pol.referenceYear - pipe.insp) > pol.inspectionInterval[overall];
+  const extra = pipe.fac.length ? ["G-SERV-01"] : [];
+  const base = { pofBand: band, pLevel: p, cLevel: c, overall, priority, life, overdue };
+  if (overall === "Intolerable" && pipe.age > life)
+    return { ...base, action: "Replacement", rule: "R1", guidelines: ["G-REPL-01", "G-RISK-01", ...extra] };
+  if ((overall === "Significant" || overall === "Intolerable") && pipe.grade >= 4)
+    return { ...base, action: "Rehabilitation", rule: "R2", guidelines: ["G-REHAB-01", "G-RISK-01", ...extra] };
+  if (overall === "Intolerable")
+    return { ...base, action: "Inspection", rule: "R3", guidelines: ["G-INSP-02", "G-RISK-01", ...extra] };
+  if (overdue)
+    return { ...base, action: "Inspection", rule: "R4", guidelines: ["G-INSP-01", ...extra] };
+  if (pol.r5 && pipe.mon === false && (overall === "Significant" || overall === "Intolerable")
+      && (pipe.hyd === "High" || pipe.hyd === "Critical"))
+    return { ...base, action: "Inspection", rule: "R5", guidelines: ["G-MON-02", ...extra] };
+  return { ...base, action: "Monitor", rule: "R0", guidelines: ["G-MON-01"] };
+}
+const MATERIAL_WORDS = { "cast iron": "CI", "ductile": "DI", "asbestos": "AC", "pvc": "PVC",
+                         "polyethylene": "HDPE", "hdpe": "HDPE", "steel": "Steel" };
+function planRules(q) {
+  const s = q.toLowerCase();
+  const p = { actions: [], excludeMonitor: false, bands: {}, material: [], installedBefore: null,
+              minFailures: null, beyondDesignLife: false, criticalFacilities: false,
+              lowPressure: false, zones: [], unmonitored: false, pipes: [], topK: 25 };
+  if (/\b(replac\w*|renew\w*|renewal)\b/.test(s)) p.actions.push("Replacement");
+  if (/\b(rehab\w*|relin\w*|refurbish\w*)\b/.test(s)) p.actions.push("Rehabilitation");
+  if (/\b(inspect\w*|survey\w*|condition assessment)\b/.test(s)) p.actions.push("Inspection");
+  if (/\b(priorit\w*|intervention|need action|urgent\w*|attention|work)\b/.test(s)) p.excludeMonitor = true;
+  if (/hydraulic\w* critical|backbone|bottleneck|betweenness|trunk/.test(s)) p.bands.hyd = ["High", "Critical"];
+  if (/(high|very high)\w* (failure|probability)|likely to fail|failure[- ]prone|probability of failure/.test(s))
+    p.bands.pof = ["High", "VeryHigh"];
+  if (s.includes("intolerable")) p.bands.overall = ["Intolerable"];
+  else if (/\bsignificant risk/.test(s)) p.bands.overall = ["Significant", "Intolerable"];
+  if (/(past|beyond|exceed\w*) (their |its |the )?design life|end of (their |its )?(service )?life/.test(s)) p.beyondDesignLife = true;
+  if (/hospital|school|care home|critical (customer|facilit|consumer)|industrial/.test(s)) p.criticalFacilities = true;
+  if (/critical service/.test(s)) p.bands.svc = ["Critical"];
+  if (/low (service |network )?pressure|pressure (deficit|margin)/.test(s)) p.lowPressure = true;
+  if (/unmonitored|not monitored|no (pressure )?(sensor|monitoring)|without (a |any )?(pressure )?(sensor|monitoring)|monitoring gap|blind spot/.test(s)) p.unmonitored = true;
+  p.zones = (q.match(/\b(PRV-\d+|PSV-\d+|PUMP_\w+|T\d+)\b/gi) || []);
+  if (/tank (zone|area)|zone (fed|supplied|served) by the tank|storage zone/.test(s)) p.zones.push("tank");
+  for (const [k, v] of Object.entries(MATERIAL_WORDS)) if (s.includes(k) && !p.material.includes(v)) p.material.push(v);
+  let m;
+  if ((m = s.match(/(before|pre-?)\s*(1[89]\d\d|20\d\d)/))) p.installedBefore = +m[2];
+  if ((m = s.match(/more than (\d+) failures/))) p.minFailures = +m[1] + 1;
+  p.pipes = [...q.matchAll(/\bpipe\s+([A-Za-z0-9_\-]+)/g)].map(x => x[1]);
+  if ((m = s.match(/\btop\s+(\d+)/))) p.topK = +m[1];
+  return p;
+}
+function resolveZone(ref, zones) {
+  const r = ref.toLowerCase();
+  for (const z of zones) {
+    const members = z.id.toLowerCase().split("+");
+    if (members.includes(r) || z.id.toLowerCase() === r) return z.id;
+    if ((r === "tank" || r === "storage") && z.storage) return z.id;
+  }
+  return null;
+}
+function retrieve(plan, pipes, decisions, data) {
+  const pol = data.config;
+  let out = pipes.filter((p, i) => {
+    const d = decisions[i];
+    if (plan.pipes.length && !plan.pipes.includes(p.id)) return false;
+    if (plan.bands.hyd && !plan.bands.hyd.includes(p.hyd)) return false;
+    if (plan.bands.svc && !plan.bands.svc.includes(p.svc)) return false;
+    if (plan.bands.pof && !plan.bands.pof.includes(d.pofBand)) return false;
+    if (plan.bands.overall && !plan.bands.overall.includes(d.overall)) return false;
+    if (plan.actions.length && !plan.actions.includes(d.action)) return false;
+    if (!plan.actions.length && plan.excludeMonitor && d.action === "Monitor") return false;
+    if (plan.material.length && !plan.material.includes(p.mat)) return false;
+    if (plan.installedBefore && !(pol.referenceYear - p.age < plan.installedBefore)) return false;
+    if (plan.minFailures !== null && p.fails < plan.minFailures) return false;
+    if (plan.beyondDesignLife && !(p.age > d.life)) return false;
+    if (plan.criticalFacilities && !p.fac.length) return false;
+    if (plan.lowPressure && !(p.minP < pol.minServicePressure + pol.pressureMargin)) return false;
+    if (plan.unmonitored && p.mon !== false) return false;
+    for (const z of plan.zones) { if (resolveZone(z, data.zones) !== p.zone) return false; }
+    return true;
+  }).map(p => ({ pipe: p, d: decisions[pipes.indexOf(p)] }));
+  out.sort((a, b) => ACTION_RANK[a.d.action] - ACTION_RANK[b.d.action] || b.d.priority - a.d.priority
+                     || (a.pipe.id < b.pipe.id ? -1 : 1));
+  return out.slice(0, plan.topK);
+}
+// LOGIC END
+
+function openNetwork(D, label) {
+  const need = ["network", "nodes", "pipes", "guidelines", "zones", "config"];
+  const missing = need.filter(k => !(k in D));
+  if (missing.length) throw new Error(`missing ${missing.join(", ")}; export the file with “python -m wateront web --json”`);
+  if (!D.pipes.length) throw new Error("the file contains no pipes");
+  if (window.__woCtl) window.__woCtl.abort();
+  main(D);
+  document.getElementById("loadStatus").textContent = label || "";
+}
+async function loadFile(file) {
+  const st = document.getElementById("loadStatus");
+  try {
+    if (/\.inp$/i.test(file.name))
+      throw new Error("this is an EPANET model; build it first in Python or Colab (python -m wateront web --inp your.inp --json) and open the .json here");
+    openNetwork(JSON.parse(await file.text()), `Opened ${file.name}. The file was read in your browser and not uploaded anywhere.`);
+  } catch (err) {
+    st.textContent = `Couldn’t open ${file.name}: ${err.message}`;
+  }
+}
+document.getElementById("openBtn").onclick = () => document.getElementById("openFile").click();
+document.getElementById("openFile").onchange = e => { if (e.target.files[0]) loadFile(e.target.files[0]); e.target.value = ""; };
+document.addEventListener("dragover", e => { e.preventDefault(); document.body.classList.add("dropping"); });
+document.addEventListener("dragleave", e => { if (!e.relatedTarget) document.body.classList.remove("dropping"); });
+document.addEventListener("drop", e => {
+  e.preventDefault(); document.body.classList.remove("dropping");
+  if (e.dataTransfer.files[0]) loadFile(e.dataTransfer.files[0]);
+});
+if (DATA) openNetwork(DATA);
+
+function main(D) {
+  const SIG = { signal: (window.__woCtl = new AbortController()).signal };
+  const on = (el, ev, fn, opts) => el.addEventListener(ev, fn, { ...(opts || {}), ...SIG });
+  const $ = id => document.getElementById(id);
+  const svgNS = "http://www.w3.org/2000/svg";
+  const css = n => getComputedStyle(document.documentElement).getPropertyValue(n).trim();
+  const esc = s => String(s).replace(/[&<>"]/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]));
+  const glById = Object.fromEntries(D.guidelines.map(g => [g.id, g]));
+  const pipeIndex = Object.fromEntries(D.pipes.map((p, i) => [p.id, i]));
+  let policy = defaultPolicy(D.config);
+  const basePolicy = defaultPolicy(D.config);
+  const baseline = D.pipes.map(p => decide(p, basePolicy));
+  let decisions = baseline.slice();
+  let highlight = null, selected = null;
+
+  $("netlabel").textContent = `${D.network}: ${D.pipes.length} pipes, ${D.graph.nodes.toLocaleString()} graph nodes`;
+  $("footnote").textContent = `Network, sensors and demands from the ${D.network} model; asset records synthetic ` +
+    `(seed ${D.config.seed}); policy clauses paraphrased for demonstration.` + (D.notice && /EUPL/.test(D.notice) ? ` ${D.notice.replace(/\.$/, "")}.` : "");
+
+  // ---------------------------------------------------------------- map geometry
+  const xs = D.nodes.map(n => n[1]), ys = D.nodes.map(n => n[2]);
+  const minX = Math.min(...xs), maxX = Math.max(...xs), minY = Math.min(...ys), maxY = Math.max(...ys);
+  const W = maxX - minX || 1, H = maxY - minY || 1;
+  const X = i => D.nodes[i][1] - minX, Y = i => maxY - D.nodes[i][2];
+  const svg = $("map");
+  for (const g of ["gPipes", "gDevices", "gSensors", "gNodes", "gSel"]) $(g).innerHTML = "";
+  $("answer").innerHTML = ""; $("q").value = ""; $("examples").hidden = false; $("moreEx").hidden = true;
+  $("pipeDetail").innerHTML = `<p class="empty">Select a pipe on the map, or type its id, to follow its evidence from the asset record to the clause that authorises the recommendation.</p>`;
+  const fit = { x: -W * 0.03, y: -H * 0.03, w: W * 1.06, h: H * 1.06 };
+  let view = { ...fit };
+  const setView = () => svg.setAttribute("viewBox", `${view.x} ${view.y} ${view.w} ${view.h}`);
+  setView();
+
+  const lines = D.pipes.map((p, i) => {
+    const l = document.createElementNS(svgNS, "line");
+    l.setAttribute("x1", X(p.s)); l.setAttribute("y1", Y(p.s));
+    l.setAttribute("x2", X(p.e)); l.setAttribute("y2", Y(p.e));
+    l.setAttribute("stroke-width", (1.1 + p.dia / 90).toFixed(2));
+    $("gPipes").appendChild(l);
+    return l;
+  });
+  for (const dv of D.devices) {
+    const l = document.createElementNS(svgNS, "line");
+    l.setAttribute("x1", X(dv.s)); l.setAttribute("y1", Y(dv.s));
+    l.setAttribute("x2", X(dv.e)); l.setAttribute("y2", Y(dv.e));
+    l.setAttribute("stroke-width", "5"); l.setAttribute("stroke", css("--ink"));
+    $("gDevices").appendChild(l);
+  }
+  const markerR = () => Math.max(view.w, view.h) / 260;
+  function drawMarkers() {
+    const r = markerR();
+    $("gNodes").innerHTML = ""; $("gSensors").innerHTML = "";
+    D.nodes.forEach((n, i) => {
+      if (n[3] === "R" || n[3] === "T") {
+        const s = document.createElementNS(svgNS, "rect");
+        s.setAttribute("x", X(i) - r * 2); s.setAttribute("y", Y(i) - r * 2);
+        s.setAttribute("width", r * 4); s.setAttribute("height", r * 4);
+        s.setAttribute("fill", css("--accent"));
+        $("gNodes").appendChild(s);
+      }
+      if ($("showSensors").checked && n[4].includes("PressureSensor")) {
+        const c = document.createElementNS(svgNS, "circle");
+        c.setAttribute("cx", X(i)); c.setAttribute("cy", Y(i)); c.setAttribute("r", r * 1.4);
+        c.setAttribute("fill", css("--surface")); c.setAttribute("stroke", css("--accent"));
+        c.setAttribute("stroke-width", r * 0.6);
+        $("gSensors").appendChild(c);
+      }
+    });
+  }
+
+  // ------------------------------------------------------------------- colouring
+  const SCALES = {
+    overall: { label: "Overall risk", get: (p, d) => d.overall,
+      keys: [["Negligible", "--r-neg"], ["Tolerable", "--r-tol"], ["Significant", "--r-sig"], ["Intolerable", "--r-int"]] },
+    action: { label: "Recommended action", get: (p, d) => d.action,
+      keys: [["Monitor", "--a-mon"], ["Inspection", "--a-insp"], ["Rehabilitation", "--a-rehab"], ["Replacement", "--a-repl"]] },
+    pof: { label: "Failure probability per km", get: (p, d) => d.pofBand,
+      keys: [["Low", "--r-neg"], ["Medium", "--r-tol"], ["High", "--r-sig"], ["VeryHigh", "--r-int"]] },
+    hyd: { label: "Hydraulic criticality", get: p => p.hyd,
+      keys: [["Low", "--r-neg"], ["Medium", "--r-tol"], ["High", "--r-sig"], ["Critical", "--r-int"]] },
+    svc: { label: "Service criticality", get: p => p.svc,
+      keys: [["Low", "--r-neg"], ["Medium", "--r-tol"], ["High", "--r-sig"], ["Critical", "--r-int"]] },
+    mon: { label: "Pressure sensor within two segments", get: p => (p.mon === false ? "No" : "Yes"),
+      keys: [["Yes", "--a-insp"], ["No", "--r-sig"]] },
+    zone: { label: "Supply zone (fed by)", get: p => p.zone || "none",
+      keys: D.zones.map((z, i) => [z.id, ["--a-insp", "--r-sig", "--a-rehab", "--r-neg", "--r-tol"][i % 5]]) },
+    mat: { label: "Material", get: p => p.mat,
+      keys: [["CI", "--r-int"], ["Steel", "--r-sig"], ["AC", "--r-tol"], ["DI", "--a-rehab"], ["PVC", "--a-insp"], ["HDPE", "--r-neg"]] },
+  };
+  const MAT_NAMES = { CI: "Cast iron", Steel: "Steel", AC: "Asbestos cement", DI: "Ductile iron", PVC: "PVC", HDPE: "Polyethylene" };
+  function paint() {
+    const sc = SCALES[$("colorBy").value];
+    const colors = Object.fromEntries(sc.keys.map(([k, v]) => [k, css(v)]));
+    const counts = {};
+    D.pipes.forEach((p, i) => {
+      const k = sc.get(p, decisions[i]);
+      counts[k] = (counts[k] || 0) + 1;
+      lines[i].setAttribute("stroke", colors[k] || css("--pipe"));
+      lines[i].classList.toggle("dimmed", !!highlight && !highlight.has(p.id));
+    });
+    const name = k => ($("colorBy").value === "mat" ? MAT_NAMES[k] : k === "VeryHigh" ? "Very high" : k);
+    $("legend").innerHTML = `<ul>${sc.keys.map(([k, v]) =>
+      `<li><i style="background:${css(v)}"></i>${esc(name(k))} <span style="color:var(--ink-2)">${counts[k] || 0}</span></li>`).join("")}</ul>` +
+      (highlight ? `<div class="note">${highlight.size} pipe(s) match the question<button class="clear" id="clearHl" type="button">Show all pipes</button></div>` : "") +
+      ($("showSensors").checked ? `<div class="note hint">Rings mark pressure sensors; squares mark sources</div>` : "");
+    if (highlight) $("clearHl").onclick = () => { highlight = null; paint(); };
+  }
+  function drawSelection() {
+    $("gSel").innerHTML = "";
+    if (selected === null) return;
+    const p = D.pipes[selected];
+    const l = document.createElementNS(svgNS, "line");
+    l.setAttribute("x1", X(p.s)); l.setAttribute("y1", Y(p.s)); l.setAttribute("x2", X(p.e)); l.setAttribute("y2", Y(p.e));
+    l.setAttribute("stroke", css("--ink")); l.setAttribute("stroke-width", "7"); l.setAttribute("stroke-opacity", "0.35");
+    $("gSel").appendChild(l);
+  }
+
+  // ------------------------------------------------------------- pan, zoom, pick
+  const toData = (cx, cy) => {
+    const r = svg.getBoundingClientRect();
+    const s = Math.max(view.w / r.width, view.h / r.height);
+    const ox = view.x + (view.w - r.width * s) / 2, oy = view.y + (view.h - r.height * s) / 2;
+    return [ox + (cx - r.left) * s, oy + (cy - r.top) * s, s];
+  };
+  function zoomAt(factor, cx, cy) {
+    const [dx, dy] = cx === undefined ? [view.x + view.w / 2, view.y + view.h / 2] : toData(cx, cy);
+    const w = Math.min(Math.max(view.w * factor, W / 60), W * 3), h = w * (view.h / view.w);
+    view = { x: dx - (dx - view.x) * (w / view.w), y: dy - (dy - view.y) * (h / view.h), w, h };
+    setView(); drawMarkers();
+  }
+  on(svg, "wheel", e => { e.preventDefault(); zoomAt(e.deltaY > 0 ? 1.15 : 1 / 1.15, e.clientX, e.clientY); }, { passive: false });
+  $("zin").onclick = () => zoomAt(1 / 1.4); $("zout").onclick = () => zoomAt(1.4);
+  $("zreset").onclick = () => { view = { ...fit }; setView(); drawMarkers(); };
+  function nearest(cx, cy) {
+    const [x, y, s] = toData(cx, cy);
+    let best = -1, bd = (10 * s) ** 2;
+    D.pipes.forEach((p, i) => {
+      const x1 = X(p.s), y1 = Y(p.s), x2 = X(p.e), y2 = Y(p.e);
+      const vx = x2 - x1, vy = y2 - y1, L = vx * vx + vy * vy || 1;
+      const t = Math.max(0, Math.min(1, ((x - x1) * vx + (y - y1) * vy) / L));
+      const d = (x1 + t * vx - x) ** 2 + (y1 + t * vy - y) ** 2;
+      if (d < bd) { bd = d; best = i; }
+    });
+    return best;
+  }
+  const pointers = new Map();
+  let drag = null, pinch = null;
+  on(svg, "pointerdown", e => {
+    svg.setPointerCapture(e.pointerId);
+    pointers.set(e.pointerId, [e.clientX, e.clientY]);
+    if (pointers.size === 1) drag = { x: e.clientX, y: e.clientY, v: { ...view }, moved: false };
+    if (pointers.size === 2) { const [a, b] = [...pointers.values()]; pinch = Math.hypot(a[0] - b[0], a[1] - b[1]); drag = null; }
+  });
+  on(svg, "pointermove", e => {
+    if (pointers.has(e.pointerId)) pointers.set(e.pointerId, [e.clientX, e.clientY]);
+    if (pinch && pointers.size === 2) {
+      const [a, b] = [...pointers.values()], d = Math.hypot(a[0] - b[0], a[1] - b[1]);
+      zoomAt(pinch / d, (a[0] + b[0]) / 2, (a[1] + b[1]) / 2); pinch = d; return;
+    }
+    if (drag) {
+      const r = svg.getBoundingClientRect(), s = Math.max(drag.v.w / r.width, drag.v.h / r.height);
+      const dx = e.clientX - drag.x, dy = e.clientY - drag.y;
+      if (Math.abs(dx) + Math.abs(dy) > 4) { drag.moved = true; svg.classList.add("dragging"); }
+      if (drag.moved) { view = { ...drag.v, x: drag.v.x - dx * s, y: drag.v.y - dy * s }; setView(); }
+      return;
+    }
+    const i = nearest(e.clientX, e.clientY), tip = $("tip");
+    if (i >= 0 && e.pointerType === "mouse") {
+      const r = $("mapwrap").getBoundingClientRect(), p = D.pipes[i];
+      tip.style.display = "block"; tip.style.left = (e.clientX - r.left) + "px"; tip.style.top = (e.clientY - r.top) + "px";
+      tip.textContent = `${p.id}: ${decisions[i].action}, ${decisions[i].overall} risk`;
+    } else tip.style.display = "none";
+  });
+  const endPointer = e => {
+    pointers.delete(e.pointerId);
+    if (pointers.size < 2) pinch = null;
+    if (drag && !drag.moved && pointers.size === 0) { const i = nearest(e.clientX, e.clientY); if (i >= 0) selectPipe(i, true); }
+    if (pointers.size === 0) { drag = null; svg.classList.remove("dragging"); }
+  };
+  on(svg, "pointerup", endPointer);
+  on(svg, "pointercancel", e => { pointers.delete(e.pointerId); drag = null; pinch = null; });
+  on(svg, "pointerleave", () => { $("tip").style.display = "none"; });
+
+  // ------------------------------------------------------------------------ tabs
+  function showTab(name) {
+    for (const t of ["ask", "pipe", "policy"]) {
+      $("tab-" + t).setAttribute("aria-selected", String(t === name));
+      $("pane-" + t).hidden = t !== name;
+    }
+  }
+  for (const t of ["ask", "pipe", "policy"]) $("tab-" + t).onclick = () => showTab(t);
+
+  // --------------------------------------------------------------------- explain
+  function why(p, d) {
+    return {
+      R1: `age ${p.age} years exceeds the ${MAT_NAMES[p.mat].toLowerCase()} design life of ${d.life} years, and overall risk is intolerable`,
+      R2: `condition grade ${p.grade} with ${d.overall.toLowerCase()} overall risk`,
+      R3: `intolerable risk within design life, so condition must be confirmed before renewal`,
+      R4: `last inspected ${p.insp}, beyond the ${policy.inspectionInterval[d.overall]}-year interval for ${d.overall.toLowerCase()} risk`,
+      R5: `${d.overall.toLowerCase()} risk on a ${p.hyd.toLowerCase()}-criticality main with no pressure sensor within two segments`,
+      R0: `${d.overall.toLowerCase()} risk and inspection up to date`,
+    }[d.rule];
+  }
+  const glChips = ids => ids.map(g => `<button class="chip" data-gl="${g}" title="${esc(glById[g].title)}">${g}</button>`).join("");
+
+  function selectPipe(i, fromMap) {
+    selected = i;
+    const p = D.pipes[i], d = decisions[i], b = baseline[i];
+    location.hash = p.id;
+    const changed = d.action !== b.action
+      ? `<div class="changed">Your policy changes this pipe from <b>${b.action}</b> (default) to <b>${d.action}</b>.</div>` : "";
+    const lifeFlag = p.age > d.life ? ` <span class="flag">beyond design life</span>` : "";
+    const sensors = p.sensors.length ? p.sensors.join(", ") : "none on this pipe";
+    $("pipeDetail").innerHTML = `${changed}
+      <ol class="trail">
+        <li><span class="node">Pipe ${esc(p.id)}</span>
+          <dl class="facts"><dt>Length</dt><dd>${p.len.toLocaleString()} m</dd><dt>Diameter</dt><dd>${p.dia} mm</dd>
+          <dt>Supply zone</dt><dd>fed by ${esc(p.zone || "none")}</dd><dt>Instruments</dt><dd>${esc(sensors)}</dd></dl></li>
+        <li><span class="rel">has asset record</span><br><span class="node">Asset record</span>
+          <dl class="facts"><dt>Material</dt><dd>${MAT_NAMES[p.mat]} <span style="color:var(--ink-2)">(${esc(p.msrc)})</span></dd>
+          <dt>Installed</dt><dd>${policy.referenceYear - p.age}, age ${p.age} years${lifeFlag}</dd>
+          <dt>Design life</dt><dd>${d.life} years</dd><dt>Condition grade</dt><dd>${p.grade} of 5</dd>
+          <dt>Failures</dt><dd>${p.fails} recorded</dd><dt>Last inspected</dt><dd>${p.insp}${d.overdue ? ` <span class="flag">overdue</span>` : ""}</dd></dl></li>
+        <li><span class="rel">has risk profile</span><br><span class="node">Risk profile</span>
+          <dl class="facts"><dt>Failure probability</dt><dd>${(p.pofKm * 100).toFixed(0)}% per km over 10 years (${d.pofBand === "VeryHigh" ? "very high" : d.pofBand.toLowerCase()}); ${(p.pof * 100).toFixed(1)}% for this segment</dd>
+          <dt>Hydraulic criticality</dt><dd>${p.hyd}</dd>
+          <dt>Service criticality</dt><dd>${p.svc}${p.fac.length ? `, serves ${esc(p.fac.join(", "))}` : ""}</dd>
+          <dt>Minimum pressure</dt><dd>${p.minP >= 9999 ? "n/a" : p.minP + " m"}</dd>
+          <dt>Pressure monitoring</dt><dd>${p.mon === false ? "no sensor within two segments" : "sensor within two segments"}</dd>
+          <dt>Overall risk</dt><dd><b>${d.overall}</b> (likelihood ${d.pLevel} × consequence ${d.cLevel} = ${d.pLevel * d.cLevel})</dd></dl></li>
+        <li><span class="rel">concerned by decision record</span><br><span class="node">Rule ${d.rule}</span>
+          <div style="font-size:13.5px">${esc(why(p, d))}</div></li>
+        <li><span class="rel">recommends</span><br><span class="act ${d.action}">${d.action}</span></li>
+        <li><span class="rel">supported by</span>
+          ${d.guidelines.map(g => `<div class="gl"><b>${g}: ${esc(glById[g].title)}</b><span style="color:var(--ink-2)">${esc(glById[g].framework)}</span><br>${esc(glById[g].text)}</div>`).join("")}</li>
+      </ol>`;
+    $("findId").value = p.id;
+    drawSelection();
+    if (fromMap) showTab("pipe");
+  }
+  $("findForm").onsubmit = e => {
+    e.preventDefault();
+    const id = $("findId").value.trim();
+    if (id in pipeIndex) { selectPipe(pipeIndex[id]); showTab("pipe"); }
+    else $("pipeDetail").innerHTML = `<p class="empty">No pipe called “${esc(id)}”. Pipe ids in ${esc(D.network)} look like ${esc(D.pipes[0].id)}.</p>`;
+  };
+
+  // ------------------------------------------------------------------------- ask
+  const EXAMPLES = [
+    "Which pipes should be replaced?",
+    "Which unmonitored hydraulically critical mains have intolerable risk?",
+    "Which pipes downstream of PRV-3 need intervention?",
+    "Which mains in the tank zone should be replaced? top 5",
+    "Which pipes at low pressure need intervention?",
+    "Which cast iron pipes are past their design life?",
+  ].filter(q => !/PRV-3/.test(q) || D.zones.some(z => z.id.includes("PRV-3")));
+  $("examples").innerHTML = EXAMPLES.map(q => `<button type="button">${esc(q)}</button>`).join("");
+  $("examples").querySelectorAll("button").forEach(b => b.onclick = () => { $("q").value = b.textContent; ask(); });
+  $("moreEx").onclick = () => { $("examples").hidden = false; $("moreEx").hidden = true; };
+  function describePlan(pl) {
+    const parts = [];
+    if (pl.actions.length) parts.push(`action is ${pl.actions.join(" or ")}`);
+    else if (pl.excludeMonitor) parts.push("action is not Monitor");
+    if (pl.bands.hyd) parts.push("hydraulic criticality High or Critical");
+    if (pl.bands.pof) parts.push("failure probability High or Very high");
+    if (pl.bands.overall) parts.push(`overall risk ${pl.bands.overall.join(" or ")}`);
+    if (pl.bands.svc) parts.push("service criticality Critical");
+    if (pl.material.length) parts.push(`material ${pl.material.join(" or ")}`);
+    if (pl.beyondDesignLife) parts.push("age beyond design life");
+    if (pl.installedBefore) parts.push(`installed before ${pl.installedBefore}`);
+    if (pl.minFailures !== null) parts.push(`at least ${pl.minFailures} failures`);
+    if (pl.criticalFacilities) parts.push("serves a critical customer");
+    if (pl.lowPressure) parts.push(`minimum pressure below ${D.config.minServicePressure + D.config.pressureMargin} m`);
+    if (pl.unmonitored) parts.push("no pressure sensor within two segments");
+    if (pl.zones.length) parts.push(`in the zone fed by ${pl.zones.join(", ")}`);
+    if (pl.pipes.length) parts.push(`pipe ${pl.pipes.join(", ")}`);
+    return parts;
+  }
+  function ask() {
+    const q = $("q").value.trim();
+    if (!q) return;
+    const pl = planRules(q), res = retrieve(pl, D.pipes, decisions, D), parts = describePlan(pl);
+    const total = retrieve({ ...pl, topK: 1e9 }, D.pipes, decisions, D).length;
+    highlight = new Set(res.map(r => r.pipe.id));
+    paint();
+    const understood = parts.length
+      ? `<div class="understood">Understood as: <b>${parts.map(esc).join("; ")}</b>. ${total > res.length ? `Showing the top ${res.length} of ${total}, ` : `${total} match, `}ranked by urgency of action, then risk.</div>`
+      : `<div class="understood">No filter recognised, so all pipes are ranked. Try naming an action (replace, rehabilitate, inspect), a risk (intolerable, likely to fail), a zone (PRV-3, tank zone) or a gap (unmonitored, low pressure).</div>`;
+    const list = res.length ? `<ol class="results">${res.map(({ pipe: p, d }) =>
+      `<li><button type="button" class="rhead" data-i="${pipeIndex[p.id]}" aria-label="Open the audit trail for ${esc(p.id)}">
+         <span class="rtitle">${esc(p.id)} <span class="act ${d.action}">${d.action}</span></span>
+         <span class="why">${esc(why(p, d))}.</span></button>
+       <div class="cites">Authorised by ${glChips(d.guidelines)}</div></li>`).join("")}</ol>`
+      : `<p class="empty">No pipe satisfies all of these conditions under the current policy. Remove a condition, or loosen the policy in the Policy tab.</p>`;
+    $("answer").innerHTML = understood + list;
+    $("answer").querySelectorAll("button.rhead").forEach(b => b.onclick = () => { selectPipe(+b.dataset.i); showTab("pipe"); });
+    $("examples").hidden = true; $("moreEx").hidden = false;
+  }
+  $("askForm").onsubmit = e => { e.preventDefault(); ask(); };
+  on(document, "click", e => {
+    const g = e.target.dataset && e.target.dataset.gl;
+    if (!g) return;
+    e.stopPropagation();
+    const box = e.target.closest("ol.results > li, .trail > li, .pane");
+    const old = box.querySelector(".gl.inline");
+    if (old && old.dataset.for === g) { old.remove(); return; }
+    if (old) old.remove();
+    const div = document.createElement("div");
+    div.className = "gl inline"; div.dataset.for = g;
+    div.innerHTML = `<b>${g}: ${esc(glById[g].title)}</b>${esc(glById[g].text)}`;
+    box.appendChild(div);
+  });
+
+  // ---------------------------------------------------------------------- policy
+  const lifeKeys = Object.keys(policy.designLife), riskKeys = ["Negligible", "Tolerable", "Significant", "Intolerable"];
+  $("lifeInputs").innerHTML = lifeKeys.map(m => `<label>${MAT_NAMES[m] || m}<input type="number" min="10" max="200" step="5" data-life="${m}"></label>`).join("");
+  $("inspInputs").innerHTML = riskKeys.map(r => `<label>${r}<input type="number" min="1" max="50" step="1" data-insp="${r}"></label>`).join("");
+  function syncInputs() {
+    [0, 1, 2].forEach(k => { $("b" + k).value = policy.pofBands[k]; $("o" + k).textContent = policy.pofBands[k].toFixed(2); });
+    document.querySelectorAll("[data-life]").forEach(el => el.value = policy.designLife[el.dataset.life]);
+    document.querySelectorAll("[data-insp]").forEach(el => el.value = policy.inspectionInterval[el.dataset.insp]);
+    $("r5").checked = policy.r5;
+  }
+  function recompute() {
+    decisions = D.pipes.map(p => decide(p, policy));
+    const now = Object.fromEntries(ACTIONS.map(a => [a, 0])), base = Object.fromEntries(ACTIONS.map(a => [a, 0]));
+    decisions.forEach(d => now[d.action]++); baseline.forEach(d => base[d.action]++);
+    $("counts").innerHTML = `<tr><th>Action</th><th>Default</th><th>Your policy</th><th>Change</th></tr>` +
+      ACTIONS.map(a => {
+        const diff = now[a] - base[a];
+        return `<tr><td><span class="act ${a}">${a}</span></td><td>${base[a]}</td><td>${now[a]}</td>
+          <td class="${diff > 0 ? "up" : diff < 0 ? "down" : ""}">${diff > 0 ? "+" : diff < 0 ? "−" : ""}${Math.abs(diff) || "0"}</td></tr>`;
+      }).join("");
+    paint();
+    if (selected !== null) selectPipe(selected);
+    if ($("answer").innerHTML && $("q").value.trim()) ask();
+  }
+  [0, 1, 2].forEach(k => on($("b" + k), "input", e => {
+    const v = +e.target.value, t = policy.pofBands.slice();
+    t[k] = v;
+    for (let j = k + 1; j < 3; j++) t[j] = Math.max(t[j], t[j - 1] + 0.01);
+    for (let j = k - 1; j >= 0; j--) t[j] = Math.min(t[j], t[j + 1] - 0.01);
+    policy.pofBands = t.map(x => Math.round(x * 100) / 100);
+    syncInputs(); recompute();
+  }));
+  on(document, "change", e => {
+    const el = e.target;
+    if (el.dataset.life) { policy.designLife[el.dataset.life] = Math.max(1, +el.value || 1); recompute(); }
+    if (el.dataset.insp) { policy.inspectionInterval[el.dataset.insp] = Math.max(1, +el.value || 1); recompute(); }
+  });
+  $("r5").onchange = () => { policy.r5 = $("r5").checked; recompute(); };
+  $("resetPolicy").onclick = () => { policy = defaultPolicy(D.config); syncInputs(); recompute(); };
+
+  $("colorBy").onchange = paint;
+  $("showSensors").onchange = () => { drawMarkers(); paint(); };
+  on(window.matchMedia("(prefers-color-scheme: dark)"), "change", () => { drawMarkers(); paint(); drawSelection(); });
+
+  syncInputs(); drawMarkers(); recompute();
+  const h = decodeURIComponent(location.hash.slice(1));
+  if (h in pipeIndex) { selectPipe(pipeIndex[h]); showTab("pipe"); }
+}
+</script>
+</body>
+</html>

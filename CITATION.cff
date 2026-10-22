@@ -1,0 +1,22 @@
+cff-version: 1.2.0
+message: "If you use this software or ontology, please cite it as below."
+title: "WaterOnt GraphRAG: explainable asset management in water networks"
+type: software
+version: 0.2.0
+date-released: 2026-10-22
+license: MIT
+repository-code: "https://github.com/YOUR-USERNAME/wateront-graphrag"
+url: "https://YOUR-USERNAME.github.io/wateront-graphrag/"
+authors:
+  - family-names: Herrera
+    given-names: Manuel
+    affiliation: "School of Engineering, Newcastle University"
+    email: manuel.herrera@ncl.ac.uk
+  - name: "et al."
+keywords:
+  - water distribution networks
+  - knowledge graphs
+  - GraphRAG
+  - asset management
+  - explainable AI
+  - EPANET
