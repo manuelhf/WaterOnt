@@ -5,8 +5,8 @@ type: software
 version: 0.2.0
 date-released: 2026-10-22
 license: MIT
-repository-code: "https://github.com/YOUR-USERNAME/wateront-graphrag"
-url: "https://YOUR-USERNAME.github.io/wateront-graphrag/"
+repository-code: "https://github.com/manuelhf/WaterOnt"
+url: "https://manuelhf.github.io/WaterOnt/"
 authors:
   - family-names: Herrera
     given-names: Manuel

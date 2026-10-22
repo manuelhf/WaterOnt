@@ -1,10 +1,10 @@
 # WaterOnt GraphRAG — code companion
 
-[![tests](https://github.com/YOUR-USERNAME/wateront-graphrag/actions/workflows/tests.yml/badge.svg)](https://github.com/YOUR-USERNAME/wateront-graphrag/actions/workflows/tests.yml)
-[![Open in Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/YOUR-USERNAME/wateront-graphrag/blob/main/demo/WaterOnt_Colab.ipynb)
+[![tests](https://github.com/manuelhf/WaterOnt/actions/workflows/tests.yml/badge.svg)](https://github.com/manuelhf/WaterOnt/actions/workflows/tests.yml)
+[![Open in Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/manuelhf/WaterOnt/blob/main/demo/WaterOnt_Colab.ipynb)
 [![Licence: MIT](https://img.shields.io/badge/code-MIT-blue.svg)](LICENSE)
 
-**[Open the live explorer](https://YOUR-USERNAME.github.io/wateront-graphrag/)**: the L-TOWN network as a knowledge graph you can question, audit pipe by pipe, and re-run under your own maintenance policy, all in the browser.
+**[Open the live explorer](https://manuelhf.github.io/WaterOnt/)**: the L-TOWN network as a knowledge graph you can question, audit pipe by pipe, and re-run under your own maintenance policy, all in the browser.
 
 Reference implementation for *Explainable Asset Management in Water Networks using GraphRAG and Engineering Knowledge Graphs*, Herrera et al. (in preparation).
 
