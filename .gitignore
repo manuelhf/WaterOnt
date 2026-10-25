@@ -1,0 +1,6 @@
+__pycache__/
+*.pkl
+*.ttl
+!ontology/*.ttl
+.pytest_cache/
+temp.*
