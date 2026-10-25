@@ -1,0 +1,17 @@
+{
+ "generated": "2026-10-25 13:56",
+ "seed": 42,
+ "llm_cells_run": true,
+ "llm_planning_failures": 0,
+ "ref_sizes": {
+  "critical_customers": 19,
+  "critical_high_pof": 25,
+  "inspection": 25,
+  "monitoring_gap": 25,
+  "multimodal_pressure_age_policy": 14,
+  "rehabilitation": 25,
+  "replacement": 25,
+  "zone_prv3": 10
+ },
+ "base_replacements": 133
+}

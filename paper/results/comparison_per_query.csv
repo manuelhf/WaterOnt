@@ -1,0 +1,97 @@
+system,intent,paraphrase,query,n_ref,n_pred,decision_precision,decision_recall,decision_f1,policy_recall,traceability,unsupported_citations,planning_failed,generator,evidence_consistency
+"No KG, no LLM (table and rules)",replacement,0,"Which pipes should be replaced, and which standard authorises each replacement?",25,25,1.0,1.0,1.0,1.0,1.0,0,False,table,1.0
+"No KG, no LLM (table and rules)",replacement,1,List the mains recommended for renewal together with the supporting policy.,25,25,1.0,1.0,1.0,1.0,1.0,0,False,table,1.0
+"No KG, no LLM (table and rules)",replacement,2,Which assets have reached the end of their life and need to be swapped out?,25,25,1.0,1.0,1.0,1.0,1.0,0,False,table,1.0
+"KG, no LLM",replacement,0,"Which pipes should be replaced, and which standard authorises each replacement?",25,25,1.0,1.0,1.0,1.0,1.0,0,False,template,1.0
+"KG, no LLM",replacement,1,List the mains recommended for renewal together with the supporting policy.,25,25,1.0,1.0,1.0,1.0,1.0,0,False,template,1.0
+"KG, no LLM",replacement,2,Which assets have reached the end of their life and need to be swapped out?,25,25,1.0,1.0,1.0,1.0,1.0,0,False,template,1.0
+"KG, LLM",replacement,0,"Which pipes should be replaced, and which standard authorises each replacement?",25,25,1.0,1.0,1.0,1.0,1.0,0,False,llm,1.0
+"KG, LLM",replacement,1,List the mains recommended for renewal together with the supporting policy.,25,25,1.0,1.0,1.0,1.0,1.0,0,False,llm,1.0
+"KG, LLM",replacement,2,Which assets have reached the end of their life and need to be swapped out?,25,25,1.0,1.0,1.0,1.0,1.0,0,False,llm,1.0
+"No KG, LLM (flat-text RAG)",replacement,0,"Which pipes should be replaced, and which standard authorises each replacement?",25,0,0.0,0.0,0.0,0.0,,0,False,flat-llm,0.3333333333333333
+"No KG, LLM (flat-text RAG)",replacement,1,List the mains recommended for renewal together with the supporting policy.,25,0,0.0,0.0,0.0,0.0,,0,False,flat-llm,0.3333333333333333
+"No KG, LLM (flat-text RAG)",replacement,2,Which assets have reached the end of their life and need to be swapped out?,25,3,0.0,0.0,0.0,0.0,1.0,0,False,flat-llm,0.3333333333333333
+"No KG, no LLM (table and rules)",rehabilitation,0,Which mains are candidates for rehabilitation?,25,25,1.0,1.0,1.0,1.0,1.0,0,False,table,0.35802469135802467
+"No KG, no LLM (table and rules)",rehabilitation,1,Which deteriorated pipes should be relined rather than replaced?,25,25,0.0,0.0,0.0,0.0,1.0,0,False,table,0.35802469135802467
+"No KG, no LLM (table and rules)",rehabilitation,2,Where should we carry out structural rehabilitation this period?,25,25,1.0,1.0,1.0,1.0,1.0,0,False,table,0.35802469135802467
+"KG, no LLM",rehabilitation,0,Which mains are candidates for rehabilitation?,25,25,1.0,1.0,1.0,1.0,1.0,0,False,template,0.35802469135802467
+"KG, no LLM",rehabilitation,1,Which deteriorated pipes should be relined rather than replaced?,25,25,0.0,0.0,0.0,0.0,1.0,0,False,template,0.35802469135802467
+"KG, no LLM",rehabilitation,2,Where should we carry out structural rehabilitation this period?,25,25,1.0,1.0,1.0,1.0,1.0,0,False,template,0.35802469135802467
+"KG, LLM",rehabilitation,0,Which mains are candidates for rehabilitation?,25,25,1.0,1.0,1.0,1.0,1.0,0,False,llm,1.0
+"KG, LLM",rehabilitation,1,Which deteriorated pipes should be relined rather than replaced?,25,25,1.0,1.0,1.0,1.0,1.0,0,False,llm,1.0
+"KG, LLM",rehabilitation,2,Where should we carry out structural rehabilitation this period?,25,25,1.0,1.0,1.0,1.0,1.0,0,False,llm,1.0
+"No KG, LLM (flat-text RAG)",rehabilitation,0,Which mains are candidates for rehabilitation?,25,0,0.0,0.0,0.0,0.0,,0,False,flat-llm,1.0
+"No KG, LLM (flat-text RAG)",rehabilitation,1,Which deteriorated pipes should be relined rather than replaced?,25,0,0.0,0.0,0.0,0.0,,0,False,flat-llm,1.0
+"No KG, LLM (flat-text RAG)",rehabilitation,2,Where should we carry out structural rehabilitation this period?,25,0,0.0,0.0,0.0,0.0,,0,False,flat-llm,1.0
+"No KG, no LLM (table and rules)",inspection,0,Which pipes need an inspection?,25,25,1.0,1.0,1.0,1.0,1.0,0,False,table,1.0
+"No KG, no LLM (table and rules)",inspection,1,Which mains are overdue for a condition survey?,25,25,1.0,1.0,1.0,1.0,1.0,0,False,table,1.0
+"No KG, no LLM (table and rules)",inspection,2,Where should condition assessment crews be sent next?,25,25,1.0,1.0,1.0,1.0,1.0,0,False,table,1.0
+"KG, no LLM",inspection,0,Which pipes need an inspection?,25,25,1.0,1.0,1.0,1.0,1.0,0,False,template,1.0
+"KG, no LLM",inspection,1,Which mains are overdue for a condition survey?,25,25,1.0,1.0,1.0,1.0,1.0,0,False,template,1.0
+"KG, no LLM",inspection,2,Where should condition assessment crews be sent next?,25,25,1.0,1.0,1.0,1.0,1.0,0,False,template,1.0
+"KG, LLM",inspection,0,Which pipes need an inspection?,25,25,1.0,1.0,1.0,1.0,1.0,0,False,llm,1.0
+"KG, LLM",inspection,1,Which mains are overdue for a condition survey?,25,25,1.0,1.0,1.0,1.0,1.0,0,False,llm,1.0
+"KG, LLM",inspection,2,Where should condition assessment crews be sent next?,25,25,1.0,1.0,1.0,1.0,1.0,0,False,llm,1.0
+"No KG, LLM (flat-text RAG)",inspection,0,Which pipes need an inspection?,25,0,0.0,0.0,0.0,0.0,,0,False,flat-llm,0.12121212121212122
+"No KG, LLM (flat-text RAG)",inspection,1,Which mains are overdue for a condition survey?,25,5,0.0,0.0,0.0,0.0,0.2,0,False,flat-llm,0.12121212121212122
+"No KG, LLM (flat-text RAG)",inspection,2,Where should condition assessment crews be sent next?,25,6,0.0,0.0,0.0,0.0,0.3333333333333333,0,False,flat-llm,0.12121212121212122
+"No KG, no LLM (table and rules)",critical_high_pof,0,Which hydraulically critical pipes also have a high failure probability?,25,25,1.0,1.0,1.0,1.0,1.0,0,False,table,1.0
+"No KG, no LLM (table and rules)",critical_high_pof,1,Show backbone mains that are likely to fail.,25,25,1.0,1.0,1.0,1.0,1.0,0,False,table,1.0
+"No KG, no LLM (table and rules)",critical_high_pof,2,Find bottleneck pipes with a high or very high probability of failure.,25,25,1.0,1.0,1.0,1.0,1.0,0,False,table,1.0
+"KG, no LLM",critical_high_pof,0,Which hydraulically critical pipes also have a high failure probability?,25,25,1.0,1.0,1.0,1.0,1.0,0,False,template,1.0
+"KG, no LLM",critical_high_pof,1,Show backbone mains that are likely to fail.,25,25,1.0,1.0,1.0,1.0,1.0,0,False,template,1.0
+"KG, no LLM",critical_high_pof,2,Find bottleneck pipes with a high or very high probability of failure.,25,25,1.0,1.0,1.0,1.0,1.0,0,False,template,1.0
+"KG, LLM",critical_high_pof,0,Which hydraulically critical pipes also have a high failure probability?,25,25,0.56,0.56,0.56,0.56,1.0,0,False,llm,0.4887334887334887
+"KG, LLM",critical_high_pof,1,Show backbone mains that are likely to fail.,25,25,0.8,0.8,0.8000000000000002,0.8,1.0,0,False,llm,0.4887334887334887
+"KG, LLM",critical_high_pof,2,Find bottleneck pipes with a high or very high probability of failure.,25,25,1.0,1.0,1.0,1.0,1.0,0,False,llm,0.4887334887334887
+"No KG, LLM (flat-text RAG)",critical_high_pof,0,Which hydraulically critical pipes also have a high failure probability?,25,16,0.125,0.08,0.09756097560975609,0.08,0.75,0,False,flat-llm,0.0425531914893617
+"No KG, LLM (flat-text RAG)",critical_high_pof,1,Show backbone mains that are likely to fail.,25,0,0.0,0.0,0.0,0.0,,0,False,flat-llm,0.0425531914893617
+"No KG, LLM (flat-text RAG)",critical_high_pof,2,Find bottleneck pipes with a high or very high probability of failure.,25,25,0.0,0.0,0.0,0.0,0.8,0,False,flat-llm,0.0425531914893617
+"No KG, no LLM (table and rules)",critical_customers,0,"Which mains serving hospitals, schools or care homes need intervention?",19,19,1.0,1.0,1.0,1.0,1.0,0,False,table,1.0
+"No KG, no LLM (table and rules)",critical_customers,1,Which pipes supplying critical customers should be prioritised?,19,19,1.0,1.0,1.0,1.0,1.0,0,False,table,1.0
+"No KG, no LLM (table and rules)",critical_customers,2,Do any pipes feeding schools or hospitals require work?,19,19,1.0,1.0,1.0,1.0,1.0,0,False,table,1.0
+"KG, no LLM",critical_customers,0,"Which mains serving hospitals, schools or care homes need intervention?",19,19,1.0,1.0,1.0,1.0,1.0,0,False,template,1.0
+"KG, no LLM",critical_customers,1,Which pipes supplying critical customers should be prioritised?,19,19,1.0,1.0,1.0,1.0,1.0,0,False,template,1.0
+"KG, no LLM",critical_customers,2,Do any pipes feeding schools or hospitals require work?,19,19,1.0,1.0,1.0,1.0,1.0,0,False,template,1.0
+"KG, LLM",critical_customers,0,"Which mains serving hospitals, schools or care homes need intervention?",19,19,1.0,1.0,1.0,1.0,1.0,0,False,llm,1.0
+"KG, LLM",critical_customers,1,Which pipes supplying critical customers should be prioritised?,19,19,1.0,1.0,1.0,1.0,1.0,0,False,llm,1.0
+"KG, LLM",critical_customers,2,Do any pipes feeding schools or hospitals require work?,19,19,1.0,1.0,1.0,1.0,1.0,0,False,llm,1.0
+"No KG, LLM (flat-text RAG)",critical_customers,0,"Which mains serving hospitals, schools or care homes need intervention?",19,0,0.0,0.0,0.0,0.0,,0,False,flat-llm,0.3333333333333333
+"No KG, LLM (flat-text RAG)",critical_customers,1,Which pipes supplying critical customers should be prioritised?,19,4,1.0,0.21052631578947367,0.34782608695652173,0.21052631578947367,1.0,0,False,flat-llm,0.3333333333333333
+"No KG, LLM (flat-text RAG)",critical_customers,2,Do any pipes feeding schools or hospitals require work?,19,0,0.0,0.0,0.0,0.0,,0,False,flat-llm,0.3333333333333333
+"No KG, no LLM (table and rules)",multimodal_pressure_age_policy,0,Which cast iron mains at low service pressure need intervention?,14,14,1.0,1.0,1.0,1.0,1.0,0,False,table,1.0
+"No KG, no LLM (table and rules)",multimodal_pressure_age_policy,1,Prioritise cast iron pipes with a low pressure margin.,14,14,1.0,1.0,1.0,1.0,1.0,0,False,table,1.0
+"No KG, no LLM (table and rules)",multimodal_pressure_age_policy,2,Which old cast iron pipes with a pressure deficit require attention?,14,14,1.0,1.0,1.0,1.0,1.0,0,False,table,1.0
+"KG, no LLM",multimodal_pressure_age_policy,0,Which cast iron mains at low service pressure need intervention?,14,14,1.0,1.0,1.0,1.0,1.0,0,False,template,1.0
+"KG, no LLM",multimodal_pressure_age_policy,1,Prioritise cast iron pipes with a low pressure margin.,14,14,1.0,1.0,1.0,1.0,1.0,0,False,template,1.0
+"KG, no LLM",multimodal_pressure_age_policy,2,Which old cast iron pipes with a pressure deficit require attention?,14,14,1.0,1.0,1.0,1.0,1.0,0,False,template,1.0
+"KG, LLM",multimodal_pressure_age_policy,0,Which cast iron mains at low service pressure need intervention?,14,14,1.0,1.0,1.0,1.0,1.0,0,False,llm,0.6296296296296297
+"KG, LLM",multimodal_pressure_age_policy,1,Prioritise cast iron pipes with a low pressure margin.,14,14,1.0,1.0,1.0,1.0,1.0,0,False,llm,0.6296296296296297
+"KG, LLM",multimodal_pressure_age_policy,2,Which old cast iron pipes with a pressure deficit require attention?,14,5,1.0,0.35714285714285715,0.5263157894736842,0.35714285714285715,1.0,0,False,llm,0.6296296296296297
+"No KG, LLM (flat-text RAG)",multimodal_pressure_age_policy,0,Which cast iron mains at low service pressure need intervention?,14,0,0.0,0.0,0.0,0.0,,0,False,flat-llm,0.3333333333333333
+"No KG, LLM (flat-text RAG)",multimodal_pressure_age_policy,1,Prioritise cast iron pipes with a low pressure margin.,14,0,0.0,0.0,0.0,0.0,,0,False,flat-llm,0.3333333333333333
+"No KG, LLM (flat-text RAG)",multimodal_pressure_age_policy,2,Which old cast iron pipes with a pressure deficit require attention?,14,7,0.0,0.0,0.0,0.0,1.0,0,False,flat-llm,0.3333333333333333
+"No KG, no LLM (table and rules)",monitoring_gap,0,Which unmonitored hydraulically critical mains have intolerable risk?,25,25,1.0,1.0,1.0,1.0,1.0,0,False,table,0.9080459770114943
+"No KG, no LLM (table and rules)",monitoring_gap,1,Show critical pipes with intolerable risk and no pressure sensor nearby.,25,25,0.92,0.92,0.92,0.92,1.0,0,False,table,0.9080459770114943
+"No KG, no LLM (table and rules)",monitoring_gap,2,Where are the monitoring blind spots on high-risk backbone mains?,25,25,1.0,1.0,1.0,1.0,1.0,0,False,table,0.9080459770114943
+"KG, no LLM",monitoring_gap,0,Which unmonitored hydraulically critical mains have intolerable risk?,25,25,1.0,1.0,1.0,1.0,1.0,0,False,template,0.9080459770114943
+"KG, no LLM",monitoring_gap,1,Show critical pipes with intolerable risk and no pressure sensor nearby.,25,25,0.92,0.92,0.92,0.92,1.0,0,False,template,0.9080459770114943
+"KG, no LLM",monitoring_gap,2,Where are the monitoring blind spots on high-risk backbone mains?,25,25,1.0,1.0,1.0,1.0,1.0,0,False,template,0.9080459770114943
+"KG, LLM",monitoring_gap,0,Which unmonitored hydraulically critical mains have intolerable risk?,25,22,0.5454545454545454,0.48,0.5106382978723404,0.48,1.0,0,False,llm,0.2546122576610381
+"KG, LLM",monitoring_gap,1,Show critical pipes with intolerable risk and no pressure sensor nearby.,25,5,0.4,0.08,0.13333333333333333,0.08,1.0,0,False,llm,0.2546122576610381
+"KG, LLM",monitoring_gap,2,Where are the monitoring blind spots on high-risk backbone mains?,25,25,0.92,0.92,0.92,0.92,1.0,0,False,llm,0.2546122576610381
+"No KG, LLM (flat-text RAG)",monitoring_gap,0,Which unmonitored hydraulically critical mains have intolerable risk?,25,18,0.16666666666666666,0.12,0.13953488372093023,0.12,0.0,0,False,flat-llm,0.2853521038044847
+"No KG, LLM (flat-text RAG)",monitoring_gap,1,Show critical pipes with intolerable risk and no pressure sensor nearby.,25,20,0.0,0.0,0.0,0.1,0.0,0,False,flat-llm,0.2853521038044847
+"No KG, LLM (flat-text RAG)",monitoring_gap,2,Where are the monitoring blind spots on high-risk backbone mains?,25,24,0.0,0.0,0.0,0.0,0.0,0,False,flat-llm,0.2853521038044847
+"No KG, no LLM (table and rules)",zone_prv3,0,Which pipes downstream of PRV-3 need intervention?,10,10,1.0,1.0,1.0,1.0,1.0,0,False,table,0.632183908045977
+"No KG, no LLM (table and rules)",zone_prv3,1,Prioritise work in the zone supplied through PRV-3.,10,10,1.0,1.0,1.0,1.0,1.0,0,False,table,0.632183908045977
+"No KG, no LLM (table and rules)",zone_prv3,2,What maintenance is needed in the PRV-3 pressure zone?,10,25,0.4,1.0,0.5714285714285715,1.0,1.0,0,False,table,0.632183908045977
+"KG, no LLM",zone_prv3,0,Which pipes downstream of PRV-3 need intervention?,10,10,1.0,1.0,1.0,1.0,1.0,0,False,template,0.632183908045977
+"KG, no LLM",zone_prv3,1,Prioritise work in the zone supplied through PRV-3.,10,10,1.0,1.0,1.0,1.0,1.0,0,False,template,0.632183908045977
+"KG, no LLM",zone_prv3,2,What maintenance is needed in the PRV-3 pressure zone?,10,25,0.4,1.0,0.5714285714285715,1.0,1.0,0,False,template,0.632183908045977
+"KG, LLM",zone_prv3,0,Which pipes downstream of PRV-3 need intervention?,10,10,1.0,1.0,1.0,1.0,1.0,0,False,llm,1.0
+"KG, LLM",zone_prv3,1,Prioritise work in the zone supplied through PRV-3.,10,10,1.0,1.0,1.0,1.0,1.0,0,False,llm,1.0
+"KG, LLM",zone_prv3,2,What maintenance is needed in the PRV-3 pressure zone?,10,10,1.0,1.0,1.0,1.0,1.0,0,False,llm,1.0
+"No KG, LLM (flat-text RAG)",zone_prv3,0,Which pipes downstream of PRV-3 need intervention?,10,0,0.0,0.0,0.0,0.0,,0,False,flat-llm,1.0
+"No KG, LLM (flat-text RAG)",zone_prv3,1,Prioritise work in the zone supplied through PRV-3.,10,0,0.0,0.0,0.0,0.0,,0,False,flat-llm,1.0
+"No KG, LLM (flat-text RAG)",zone_prv3,2,What maintenance is needed in the PRV-3 pressure zone?,10,0,0.0,0.0,0.0,0.0,,0,False,flat-llm,1.0

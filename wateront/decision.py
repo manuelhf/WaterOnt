@@ -128,6 +128,7 @@ def pipe_facts(kg: KnowledgeGraph, pipe_uid: str) -> dict:
                 age=ar["age"], design_life=ar["designLife"], condition_grade=ar["conditionGrade"],
                 last_inspection_year=ar["lastInspectionYear"], failure_count=ar["failureCount"],
                 pof=rp["failureProbability"], pof_km=rp.get("failureProbabilityPerKm", rp["failureProbability"]),
+                likelihood_source=rp.get("likelihoodSource", "weibull"),
                 pof_band=band("HAS_FAILURE_PROBABILITY"),
                 hydraulic=band("HAS_HYDRAULIC_CRITICALITY"), service=band("HAS_SERVICE_CRITICALITY"),
                 overall=band("HAS_OVERALL_RISK"), priority=rp["priority"],

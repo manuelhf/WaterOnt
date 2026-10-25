@@ -75,3 +75,5 @@ class Config:
     # LLM (optional)
     llm_model: str = "claude-sonnet-5-5"
     llm_max_tokens: int = 1500
+    llm_max_tokens_flat: int = 8000   # flat-text RAG writes one JSON decision per pipe (up to 40)
+    llm_max_tokens_plan: int = 1500   # query plan as JSON

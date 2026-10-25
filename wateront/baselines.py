@@ -156,17 +156,33 @@ class FlatRAGBaseline:
         plan = plan_rules(query)
         hits = self.index.search(query, k=self.k_cards)
         cards = [d for d, _ in hits if d["kind"] == "asset"]
-        policy = [d for d, _ in self.index.search(query, k=len(self.index.docs)) if d["kind"] == "policy"][:5]
+        # the whole policy (12 clauses) is short, so the LLM is given all of it
+        policy = [dict(id=g["id"], kind="policy", title=g["title"], text=g["text"]) for g in self.guidelines]
         ctx = "\n".join(f"[{d['id']}] {d['text']}" for d in cards) + "\n\nPolicy:\n" + \
             "\n".join(f"[{g['id']}] {g['title']}: {g['text']}" for g in policy)
         msg = _anthropic_client().messages.create(
-            model=self.cfg.llm_model, max_tokens=self.cfg.llm_max_tokens, system=self.LLM_SYSTEM,
+            model=self.cfg.llm_model, max_tokens=self.cfg.llm_max_tokens_flat,
+            system=self.LLM_SYSTEM,
             messages=[{"role": "user", "content": f"{ctx}\n\nQuestion: {query}"}])
         raw = "".join(b.text for b in msg.content if b.type == "text")
+        if getattr(msg, "stop_reason", None) == "max_tokens":
+            print(f"[flat-llm] answer hit the output limit ({self.cfg.llm_max_tokens_flat} tokens); "
+                  "complete entries are kept")
+        text = re.sub(r"```(json)?", "", raw).strip()
+        listed = text[text.index("["): text.rindex("]") + 1] if "[" in text and "]" in text else text
         try:
-            items = json.loads(re.sub(r"```(json)?", "", raw).strip())
+            items = json.loads(listed)                   # a complete list, possibly inside prose
+            if not isinstance(items, list):
+                raise json.JSONDecodeError("not a list", listed, 0)
         except json.JSONDecodeError:
+            # salvage every complete {...} entry from the whole answer, e.g. when it was cut off
             items = []
+            for obj in re.findall(r"\{[^{}]*\}", text):
+                try:
+                    items.append(json.loads(obj))
+                except json.JSONDecodeError:
+                    pass
+            print(f"[flat-llm] answer was not a complete JSON list; recovered {len(items)} complete entries")
         recs = []
         for it in items[: plan.top_k]:
             uid = str(it.get("pipe", "")).strip("[]")
@@ -178,3 +194,73 @@ class FlatRAGBaseline:
         ans.unsupported_citations = sorted({g for e in recs for g in e.guidelines if g not in allowed}
                                            | {e.pipe_uid for e in recs if e.pipe_uid not in allowed})
         return ans
+
+
+class TableRulesBaseline:
+    """Structured, non-graph baseline: one table row per pipe with the same attributes the
+    graph holds, the same policy rules, and the same keyword planner, answering questions
+    by filtering rows instead of traversing the graph.
+
+    Several columns describe network relationships (supply zone, pressure sensor within two
+    links, critical customers at the pipe ends, minimum pressure at the ends, hydraulic
+    criticality). A table cannot derive them; they are computed from the network
+    beforehand and stored as columns (`DERIVED_COLUMNS`).
+    """
+    name = "Table and rules"
+    DERIVED_COLUMNS = ["zone", "monitored", "facilities", "min_end_pressure", "hydraulic"]
+
+    def __init__(self, kg: KnowledgeGraph, cfg: Config | None = None):
+        from .decision import apply_policy
+        self.cfg = cfg or Config()
+        rows = []
+        for p in kg.nodes("Pipe"):
+            f = pipe_facts(kg, p)              # same values the graph holds, flattened to one row
+            d = apply_policy(f, self.cfg)      # same rules, applied to the row
+            rows.append({**f, "action": d.action, "rule": d.rule, "guidelines": d.guidelines})
+        self.table = pd.DataFrame(rows).set_index("uid")
+
+    def ask(self, query: str) -> Answer:
+        plan = plan_rules(query)
+        t, cfg = self.table, self.cfg
+        m = pd.Series(True, index=t.index)
+        if plan.pipes:
+            m &= t.pipe.isin(plan.pipes)
+        if plan.bands.get("hydraulic"):
+            m &= t.hydraulic.isin(plan.bands["hydraulic"])
+        if plan.bands.get("service"):
+            m &= t.service.isin(plan.bands["service"])
+        if plan.bands.get("pof"):
+            m &= t.pof_band.isin(plan.bands["pof"])
+        if plan.bands.get("overall"):
+            m &= t.overall.isin(plan.bands["overall"])
+        if plan.actions:
+            m &= t.action.isin(plan.actions)
+        elif plan.exclude_monitor:
+            m &= t.action != "Monitor"
+        if plan.material:
+            m &= t.material.isin(plan.material)
+        if plan.installed_before:
+            m &= (cfg.reference_year - t.age) < plan.installed_before
+        if plan.min_failures is not None:
+            m &= t.failure_count >= plan.min_failures
+        if plan.beyond_design_life:
+            m &= t.age > t.design_life
+        if plan.critical_facilities:
+            m &= t.facilities.map(bool)
+        if plan.low_pressure:
+            m &= t.min_end_pressure < cfg.min_service_pressure_m + cfg.pressure_margin_m
+        if plan.unmonitored:
+            m &= t.monitored == False  # noqa: E712
+        for z in plan.zones:
+            zl = z.lower()
+            m &= t.zone.fillna("").map(lambda name: zl in name.lower().split("+") or zl == name.lower()
+                                       or (zl in ("tank", "storage") and any(x.startswith("t") for x in name.lower().split("+"))))
+        hits = t[m].copy()
+        hits["rank"] = hits.action.map(ACTION_RANK)
+        # same ordering as the graph pipeline: action urgency, then priority, then pipe id
+        hits = hits.iloc[np.lexsort((hits.index.values, -hits.priority.values, hits["rank"].values))]
+        recs = [Evidence(uid, {k: v for k, v in r.items() if k not in ("action", "rule", "guidelines", "rank")},
+                         r.action, r.rule, list(r.guidelines), []) for uid, r in hits.head(plan.top_k).iterrows()]
+        text = "\n".join(f"[{e.pipe_uid}] {e.action} (rule {e.rule}) per " + ", ".join(f"[{g}]" for g in e.guidelines)
+                         for e in recs)
+        return Answer(query, plan, recs, [], text, generator="table")

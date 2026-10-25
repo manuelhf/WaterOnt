@@ -1,0 +1,25 @@
+question_type,intent_key,phrasing,question,reference_condition
+Replacement,replacement,1,"Which pipes should be replaced, and which standard authorises each replacement?",Action is Replacement
+Replacement,replacement,2,List the mains recommended for renewal together with the supporting policy.,Action is Replacement
+Replacement,replacement,3,Which assets have reached the end of their life and need to be swapped out?,Action is Replacement
+Rehabilitation,rehabilitation,1,Which mains are candidates for rehabilitation?,Action is Rehabilitation
+Rehabilitation,rehabilitation,2,Which deteriorated pipes should be relined rather than replaced?,Action is Rehabilitation
+Rehabilitation,rehabilitation,3,Where should we carry out structural rehabilitation this period?,Action is Rehabilitation
+Inspection,inspection,1,Which pipes need an inspection?,Action is Inspection
+Inspection,inspection,2,Which mains are overdue for a condition survey?,Action is Inspection
+Inspection,inspection,3,Where should condition assessment crews be sent next?,Action is Inspection
+Critical and likely to fail,critical_high_pof,1,Which hydraulically critical pipes also have a high failure probability?,Hydraulic criticality High or Critical and failure probability High or Very high
+Critical and likely to fail,critical_high_pof,2,Show backbone mains that are likely to fail.,Hydraulic criticality High or Critical and failure probability High or Very high
+Critical and likely to fail,critical_high_pof,3,Find bottleneck pipes with a high or very high probability of failure.,Hydraulic criticality High or Critical and failure probability High or Very high
+Critical customers,critical_customers,1,"Which mains serving hospitals, schools or care homes need intervention?",Supplies a critical customer and needs intervention
+Critical customers,critical_customers,2,Which pipes supplying critical customers should be prioritised?,Supplies a critical customer and needs intervention
+Critical customers,critical_customers,3,Do any pipes feeding schools or hospitals require work?,Supplies a critical customer and needs intervention
+Material and pressure,multimodal_pressure_age_policy,1,Which cast iron mains at low service pressure need intervention?,"Cast iron, minimum pressure below 30 m, and needs intervention"
+Material and pressure,multimodal_pressure_age_policy,2,Prioritise cast iron pipes with a low pressure margin.,"Cast iron, minimum pressure below 30 m, and needs intervention"
+Material and pressure,multimodal_pressure_age_policy,3,Which old cast iron pipes with a pressure deficit require attention?,"Cast iron, minimum pressure below 30 m, and needs intervention"
+Monitoring gap,monitoring_gap,1,Which unmonitored hydraulically critical mains have intolerable risk?,"Unmonitored, hydraulic criticality High or Critical, overall risk Intolerable"
+Monitoring gap,monitoring_gap,2,Show critical pipes with intolerable risk and no pressure sensor nearby.,"Unmonitored, hydraulic criticality High or Critical, overall risk Intolerable"
+Monitoring gap,monitoring_gap,3,Where are the monitoring blind spots on high-risk backbone mains?,"Unmonitored, hydraulic criticality High or Critical, overall risk Intolerable"
+Supply zone,zone_prv3,1,Which pipes downstream of PRV-3 need intervention?,In the zone fed by PRV-3 and needs intervention
+Supply zone,zone_prv3,2,Prioritise work in the zone supplied through PRV-3.,In the zone fed by PRV-3 and needs intervention
+Supply zone,zone_prv3,3,What maintenance is needed in the PRV-3 pressure zone?,In the zone fed by PRV-3 and needs intervention

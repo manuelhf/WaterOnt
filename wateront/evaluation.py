@@ -155,7 +155,9 @@ def run_evaluation(kg: KnowledgeGraph, systems: dict, cfg: Config | None = None,
             for i, q in enumerate(it.paraphrases):
                 ans = sysm.ask(q)
                 answers[(name, it.key, i)] = ans
-                rows.append(dict(system=name, intent=it.key, paraphrase=i, query=q, **score(kg, ans, ref)))
+                rows.append(dict(system=name, intent=it.key, paraphrase=i, query=q, **score(kg, ans, ref),
+                                 planning_failed=bool(getattr(ans, "planning_failed", False)),
+                                 generator=ans.generator))
     if skipped:
         print(f"[eval] skipped intents with empty reference on this network: {skipped}")
     per_query = pd.DataFrame(rows)

@@ -146,6 +146,37 @@ def choose_critical_facilities(wn: wntr.network.WaterNetworkModel, cfg: Config,
     return out
 
 
+def apply_likelihood_scores(df: pd.DataFrame, scores: dict[str, float], source: str) -> pd.DataFrame:
+    """Replace the Weibull likelihood with an external model's scores (e.g. a utility's
+    failure-prediction model), keeping consequence, policy and traceability unchanged.
+
+    Scores are mapped onto the likelihood bands by rank, so that each band keeps exactly
+    the number of pipes the Weibull model assigns to it. Decisions then differ only in
+    *which* pipes a model ranks as likely to fail, not in how its scores are calibrated.
+    """
+    out = df.copy()
+    missing = set(out.index) - set(scores)
+    if missing:
+        raise ValueError(f"likelihood scores missing for {len(missing)} pipes, e.g. {sorted(missing)[:3]}")
+    s = pd.Series({p: float(scores[p]) for p in out.index})
+    counts = out.pof_band.value_counts()
+    order = s.sort_values(kind="mergesort").index           # lowest likelihood first
+    bands, k = {}, 0
+    for b in ["Low", "Medium", "High", "VeryHigh"]:
+        for p in order[k:k + int(counts.get(b, 0))]:
+            bands[p] = b
+        k += int(counts.get(b, 0))
+    out["pof_band"] = pd.Series(bands)
+    out["pof_level"] = out.pof_band.map(LEVEL)
+    out["risk_score"] = out.pof_level * out.consequence_level
+    out["overall_risk"] = [overall_category(p, c) for p, c in zip(out.pof_level, out.consequence_level)]
+    pct = s.rank(pct=True)
+    out["priority"] = out.risk_score + pct * np.maximum(out.hydraulic_score, out.service_score)
+    out["likelihood_score"] = s
+    out["likelihood_source"] = source
+    return out
+
+
 def build_risk_layer(wn: wntr.network.WaterNetworkModel, kg: KnowledgeGraph,
                      risk: pd.DataFrame, nodes: pd.DataFrame, facilities: dict[str, str]) -> None:
     for b in ["Low", "Medium", "High", "VeryHigh"]:
@@ -175,7 +206,9 @@ def build_risk_layer(wn: wntr.network.WaterNetworkModel, kg: KnowledgeGraph,
                          minEndPressure=round(min(r.min_end_pressure, 9999.0), 2),
                          hydraulicScore=round(r.hydraulic_score, 3),
                          serviceScore=round(r.service_score, 3),
-                         riskScore=int(r.risk_score), priority=round(float(r.priority), 4))
+                         riskScore=int(r.risk_score), priority=round(float(r.priority), 4),
+                         likelihoodSource=str(r.get("likelihood_source", "weibull")),
+                         likelihoodScore=round(float(r.get("likelihood_score", r.pof_km)), 6))
         kg.add_edge(pid, "HAS_RISK_PROFILE", rp)
         kg.add_edge(rp, "HAS_FAILURE_PROBABILITY", f"FP:{r.pof_band}")
         kg.add_edge(rp, "HAS_HYDRAULIC_CRITICALITY", f"HC:{r.hydraulic_band}")

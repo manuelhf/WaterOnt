@@ -223,3 +223,6 @@ wno:materialSource a owl:DatatypeProperty ; rdfs:domain wno:AssetRecord ; rdfs:r
     rdfs:comment "Provenance: register | model-hint:<evidence> | prior." .
 wno:IndustrialCustomer a owl:Class ; rdfs:subClassOf wno:CriticalFacility ;
     rdfs:comment "Junction with an industrial demand category in the hydraulic model." .
+wno:likelihoodSource a owl:DatatypeProperty ; rdfs:domain wno:RiskProfile ; rdfs:range xsd:string ;
+    rdfs:comment "Model that supplied the failure likelihood: the Weibull prior, or an external failure-prediction model." .
+wno:likelihoodScore a owl:DatatypeProperty ; rdfs:domain wno:RiskProfile ; rdfs:range xsd:float .

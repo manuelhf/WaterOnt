@@ -108,12 +108,25 @@ def _anthropic_client():
     return anthropic.Anthropic()
 
 
+class PlanParseError(ValueError):
+    """The LLM answered, but its query plan could not be read. This is a failure of the
+    planner on that question (scored), not an API problem (which aborts an experiment)."""
+
+
 def plan_llm(q: str, cfg: Config) -> QueryPlan:
     msg = _anthropic_client().messages.create(
-        model=cfg.llm_model, max_tokens=400, system=PLANNER_PROMPT,
-        messages=[{"role": "user", "content": q}])
+        model=cfg.llm_model, max_tokens=cfg.llm_max_tokens_plan,
+        system=PLANNER_PROMPT, messages=[{"role": "user", "content": q}])
     raw = "".join(b.text for b in msg.content if b.type == "text")
-    data = json.loads(re.sub(r"```(json)?", "", raw).strip())
+    text = re.sub(r"```(json)?", "", raw).strip()
+    if "{" in text and "}" in text:                      # tolerate prose around the JSON object
+        text = text[text.index("{"): text.rindex("}") + 1]
+    try:
+        data = json.loads(text)
+        if not isinstance(data, dict):
+            raise ValueError("plan is not a JSON object")
+    except ValueError as exc:
+        raise PlanParseError(f"{exc}; planner answer: {raw[:300]!r}") from None
     allowed = QueryPlan.__dataclass_fields__.keys()
     plan = QueryPlan(**{k: v for k, v in data.items() if k in allowed})
     plan.actions = [a for a in plan.actions if a in ACTIONS]
@@ -147,12 +160,24 @@ class Answer:
 
 class GraphRAG:
     def __init__(self, kg: KnowledgeGraph, cfg: Config | None = None,
-                 use_llm: bool | None = None, embed=None):
+                 use_llm: bool | None = None, embed=None, strict: bool = False):
+        """strict=True: an LLM failure raises instead of falling back to the keyword planner or
+        template. Experiments must use strict mode, so a failed call can never be recorded as
+        an LLM result."""
+        self.strict = strict
         self.kg, self.cfg = kg, cfg or Config()
         self.retriever = GraphRetriever(kg)
         self.guidelines = [kg.node(g) for g in kg.nodes("EngineeringGuideline")]
         self.index = VectorIndex(self.guidelines, embed=embed)
         self.use_llm = bool(os.environ.get("ANTHROPIC_API_KEY")) if use_llm is None else use_llm
+
+    def _plan_with_llm(self, query: str) -> QueryPlan:
+        """One retry if the plan cannot be read; API errors propagate unchanged."""
+        try:
+            return plan_llm(query, self.cfg)
+        except PlanParseError as first:
+            print(f"[graphrag] planner answer could not be read, retrying once: {first}")
+            return plan_llm(query, self.cfg)
 
     # ---------------------------------------------------------------- retrieve
     def retrieve(self, plan: QueryPlan) -> list[Evidence]:
@@ -201,8 +226,17 @@ class GraphRAG:
             plan = plan_rules(query)
             if self.use_llm:
                 try:
-                    plan = plan_llm(query, self.cfg)
-                except Exception as exc:  # fall back to deterministic planner
+                    plan = self._plan_with_llm(query)
+                except PlanParseError as exc:
+                    if self.strict:   # experiments: a plan that cannot be read is a scored failure
+                        print(f"[graphrag] planner failed twice on {query!r}: {exc}")
+                        ans = Answer(query, QueryPlan(top_k=0), [], [], "", generator="llm (planning failed)")
+                        ans.planning_failed = True
+                        return ans
+                    print(f"[graphrag] LLM planner failed ({exc}); using rule planner")
+                except Exception as exc:  # API errors: abort experiments, fall back interactively
+                    if self.strict:
+                        raise
                     print(f"[graphrag] LLM planner failed ({exc}); using rule planner")
         recs = self.retrieve(plan)
         policy = [d for d, _ in self.index.search(query, k=3)]
@@ -211,6 +245,8 @@ class GraphRAG:
             try:
                 text, gen = self.generate_llm(query, context), "llm"
             except Exception as exc:
+                if self.strict:
+                    raise
                 print(f"[graphrag] LLM generation failed ({exc}); using template")
                 text, gen = self.generate_template(query, recs, policy), "template"
         else:
@@ -231,6 +267,7 @@ class GraphRAG:
                 f"hydraulic={f['hydraulic']} service={f['service']} overall={f['overall']} "
                 f"min_pressure={f['min_end_pressure']}m facilities={f['facilities'] or 'none'} "
                 f"zone={f.get('zone')} monitored={f.get('monitored')} material_source={f.get('material_source')} "
+                f"likelihood_source={f.get('likelihood_source', 'weibull')} "
                 f"| supported_by={','.join(f'[{g}]' for g in e.guidelines)}")
         ids = {g for e in recs for g in e.guidelines} | {g["id"] for g in policy}
         lines.append("\n## Policy clauses")
@@ -274,7 +311,8 @@ class GraphRAG:
                   "with its bracketed id exactly as given, e.g. [P:101] and [G-REPL-01]. If the "
                   "evidence is empty or insufficient, say so.")
         msg = _anthropic_client().messages.create(
-            model=self.cfg.llm_model, max_tokens=self.cfg.llm_max_tokens, system=system,
+            model=self.cfg.llm_model, max_tokens=self.cfg.llm_max_tokens,
+            system=system,
             messages=[{"role": "user", "content": f"{context}\n\n## Question\n{query}"}])
         return "".join(b.text for b in msg.content if b.type == "text")
 

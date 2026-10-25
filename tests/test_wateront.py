@@ -214,3 +214,129 @@ def test_failure_loader_and_holdout_capture(tmp_path):
     assert [y for y, _ in ev["p1"]] == [2019, 2019] and ev["p7"] == [(2018, "Burst")]
     cap = holdout_capture({"s": ["a", "b", "c"]}, {"b"}, {"a": 10, "b": 10, "c": 80}, budgets=(0.2,))
     assert cap.captured[0] == 1 and cap.lift[0] == 5.0
+
+
+def test_external_likelihood_identity_and_provenance(built):
+    """Feeding the Weibull probabilities back as 'external' scores must reproduce every
+    decision; feeding other scores keeps band sizes and records the source."""
+    from wateront.pipeline import build_knowledge_graph
+    w = built.risk.pof_km.to_dict()
+    same = build_knowledge_graph("Net3", likelihood_scores=w, likelihood_source="weibull copy", verbose=False)
+    assert [d.action for d in same.decisions] == [d.action for d in built.decisions]
+    rev = {p: -v for p, v in w.items()}                       # reversed ranking
+    other = build_knowledge_graph("Net3", likelihood_scores=rev, likelihood_source="reversed", verbose=False)
+    assert other.risk.pof_band.value_counts().to_dict() == built.risk.pof_band.value_counts().to_dict()
+    assert other.kg.node("RP:101")["likelihoodSource"] == "reversed"
+    assert [d.action for d in other.decisions] != [d.action for d in built.decisions]
+
+
+def test_flat_rag_llm_path_with_mock(built, monkeypatch):
+    """The 'no KG, with LLM' cell: the model sees asset records and the full policy,
+    returns JSON decisions, and citations outside its context are flagged."""
+    import wateront.graphrag as gr
+    from wateront.baselines import FlatRAGBaseline
+    flat = FlatRAGBaseline(built.kg, use_llm=True)
+    seen = {}
+    def fake_client():
+        def create(**kw):
+            seen["prompt"] = kw["messages"][0]["content"]
+            reply = json.dumps([{"pipe": "P:101", "action": "Replacement", "guidelines": ["G-REPL-01", "G-FAKE-1"]}])
+            return types.SimpleNamespace(content=[types.SimpleNamespace(type="text", text=reply)])
+        return types.SimpleNamespace(messages=types.SimpleNamespace(create=create))
+    monkeypatch.setattr(gr, "_anthropic_client", fake_client)
+    ans = flat.ask("Which pipes should be replaced?")
+    assert all(f"[{g['id']}]" in seen["prompt"] for g in flat.guidelines)        # full policy in context
+    assert [(e.pipe_uid, e.action) for e in ans.recommendations] == [("P:101", "Replacement")]
+    assert "G-FAKE-1" in ans.unsupported_citations
+
+
+def test_table_rules_baseline_matches_graph_answers(built):
+    """Same attributes + same rules + same planner in a table gives the same answers:
+    the policy, not the graph, determines fidelity. The table has no evidence paths."""
+    from wateront.baselines import TableRulesBaseline
+    from wateront.evaluation import INTENTS
+    rag, tab = GraphRAG(built.kg, use_llm=False), TableRulesBaseline(built.kg)
+    for it in INTENTS:
+        for q in it.paraphrases:
+            a, b = rag.ask(q), tab.ask(q)
+            assert [(e.pipe_uid, e.action, e.guidelines) for e in a.recommendations] == \
+                   [(e.pipe_uid, e.action, e.guidelines) for e in b.recommendations], q
+            assert all(not e.path for e in b.recommendations)
+
+
+def _failing_client():
+    def create(**kw):
+        raise RuntimeError("401 invalid x-api-key")
+    return types.SimpleNamespace(messages=types.SimpleNamespace(create=create))
+
+
+def test_strict_mode_never_hides_llm_failures(built, monkeypatch):
+    """Experiments use strict=True: an LLM failure must raise, never fall back silently."""
+    import wateront.graphrag as gr
+    monkeypatch.setattr(gr, "_anthropic_client", _failing_client)
+    with pytest.raises(RuntimeError, match="401"):
+        GraphRAG(built.kg, use_llm=True, strict=True).ask("Which pipes should be replaced?")
+    relaxed = GraphRAG(built.kg, use_llm=True).ask("Which pipes should be replaced?")   # app keeps working
+    assert relaxed.generator == "template"
+
+
+def test_experiments_stop_on_invalid_key(monkeypatch):
+    import sys as _sys
+    _sys.path.insert(0, os.path.join(ROOT, "paper"))
+    import experiments
+    import wateront.graphrag as gr
+    monkeypatch.setattr(gr, "_anthropic_client", _failing_client)
+    with pytest.raises(SystemExit, match="LLM check failed"):
+        experiments.check_api(Config())
+
+
+def test_flat_llm_reads_json_inside_prose(built, monkeypatch):
+    import wateront.graphrag as gr
+    from wateront.baselines import FlatRAGBaseline
+    reply = 'Here are my decisions:\n[{"pipe": "P:101", "action": "Replacement", "guidelines": ["G-REPL-01"]}]\nThanks.'
+    monkeypatch.setattr(gr, "_anthropic_client", lambda: _FakeClient(reply))
+    ans = FlatRAGBaseline(built.kg, use_llm=True).ask("Which pipes should be replaced?")
+    assert [(e.pipe_uid, e.action) for e in ans.recommendations] == [("P:101", "Replacement")]
+
+
+def test_flat_llm_recovers_entries_from_truncated_answer(built, monkeypatch):
+    """An answer cut off by the output limit keeps every complete entry (seen on Colab)."""
+    import wateront.graphrag as gr
+    from wateront.baselines import FlatRAGBaseline
+    reply = ('```json\n[\n{"pipe":"P:101","action":"Inspection","guidelines":["G-MON-02"]},\n'
+             '{"pipe":"P:105","action":"Replacement","guidelines":["G-REPL-01"]},\n{"pipe":"P:1')
+    monkeypatch.setattr(gr, "_anthropic_client", lambda: _FakeClient(reply))
+    ans = FlatRAGBaseline(built.kg, use_llm=True).ask("Which pipes need an inspection?")
+    assert [(e.pipe_uid, e.action) for e in ans.recommendations] == [("P:101", "Inspection"), ("P:105", "Replacement")]
+
+
+class _SequenceClient:
+    """Returns the given replies in turn (one per API call)."""
+    def __init__(self, replies):
+        self.replies, self.calls = list(replies), 0
+        self.messages = types.SimpleNamespace(create=self._create)
+    def _create(self, **kw):
+        self.calls += 1
+        return types.SimpleNamespace(content=[types.SimpleNamespace(type="text", text=self.replies.pop(0))])
+
+
+def test_unreadable_plan_is_retried_then_scored_as_failure(built, monkeypatch):
+    import wateront.graphrag as gr
+    good = json.dumps({"actions": ["Replacement"]})
+    # first answer truncated, retry succeeds, then the generator answers
+    seq = _SequenceClient(['{"actions": ["Repla', good, "Replace [P:101] per [G-REPL-01]."])
+    monkeypatch.setattr(gr, "_anthropic_client", lambda: seq)
+    ans = GraphRAG(built.kg, use_llm=True, strict=True).ask("Which pipes should be replaced?")
+    assert ans.recommendations and not getattr(ans, "planning_failed", False) and seq.calls == 3
+    # both planner answers unreadable: scored empty answer, no exception, flagged
+    seq2 = _SequenceClient(['{"actions": ["Repla', 'not json at all'])
+    monkeypatch.setattr(gr, "_anthropic_client", lambda: seq2)
+    ans2 = GraphRAG(built.kg, use_llm=True, strict=True).ask("Which pipes should be replaced?")
+    assert ans2.recommendations == [] and ans2.planning_failed and seq2.calls == 2
+
+
+def test_api_errors_still_abort_in_strict_mode(built, monkeypatch):
+    import wateront.graphrag as gr
+    monkeypatch.setattr(gr, "_anthropic_client", _failing_client)
+    with pytest.raises(RuntimeError, match="401"):
+        GraphRAG(built.kg, use_llm=True, strict=True).ask("Which pipes should be replaced?")

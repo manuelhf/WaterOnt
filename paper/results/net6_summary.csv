@@ -1,0 +1,3 @@
+system,decision_f1,policy_recall,traceability,unsupported_citations,evidence_consistency
+"No KG, no LLM (table and rules)",0.9444444444444444,0.9444444444444444,1.0,0.0,0.8909853249475891
+"KG, no LLM",0.9444444444444444,0.9444444444444444,1.0,0.0,0.8909853249475891

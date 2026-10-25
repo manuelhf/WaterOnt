@@ -15,7 +15,8 @@ from .decision import Decision, build_decision_layer, load_guidelines
 from .kg import KnowledgeGraph
 from .physical import (build_instrumentation, build_physical_layer, build_pressure_zones,
                        load_sensors, pipes_near_sensor)
-from .risk import build_risk_layer, choose_critical_facilities, compute_risk_table
+from .risk import (apply_likelihood_scores, build_risk_layer, choose_critical_facilities,
+                   compute_risk_table)
 
 
 @dataclass
@@ -43,6 +44,8 @@ def resolve_inp(name_or_path: str) -> str:
 def build_knowledge_graph(inp: str, cfg: Config | None = None, asset_csv: str | None = None,
                           guidelines_json: str | None = None, failures_csv: str | None = None,
                           facilities_csv: str | None = None, sensors_csv: str | None = None,
+                          likelihood_scores: dict[str, float] | None = None,
+                          likelihood_source: str = "external model",
                           verbose: bool = True) -> BuildResult:
     cfg = cfg or Config()
     path = resolve_inp(inp)
@@ -87,6 +90,9 @@ def build_knowledge_graph(inp: str, cfg: Config | None = None, asset_csv: str | 
     risk, node_state = compute_risk_table(wn, assets, cfg, facilities, monitored)
     if monitored is None:   # no sensor metadata: treat monitoring status as unknown, not absent
         risk["monitored"] = True
+    if likelihood_scores is not None:
+        risk = apply_likelihood_scores(risk, likelihood_scores, likelihood_source)
+        log(f"[risk]     likelihood from {likelihood_source} (rank-mapped onto the Weibull band sizes)")
     build_risk_layer(wn, kg, risk, node_state, facilities)
     log(f"[risk]     overall risk: {risk.overall_risk.value_counts().to_dict()}")
 
