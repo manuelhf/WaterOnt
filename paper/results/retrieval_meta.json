@@ -1,0 +1,22 @@
+{
+ "generated": "2026-10-25 21:25",
+ "seed": 42,
+ "dense_model": "BAAI/bge-small-en-v1.5",
+ "llm_model": "claude-sonnet-5-5",
+ "llm_retrievers": [
+  "tfidf",
+  "dense"
+ ],
+ "graphrag_in_run": true,
+ "llm_run": true,
+ "no_recommendation_questions": {
+  "No KG, LLM (TF-IDF RAG)": 14,
+  "No KG, LLM (dense RAG)": 3,
+  "KG, LLM (WaterOnt GraphRAG)": 0
+ },
+ "llm_planning_failures": 0,
+ "versions": {
+  "anthropic": "2.3.0",
+  "sentence_transformers": "5.7.0"
+ }
+}

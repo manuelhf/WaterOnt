@@ -1,0 +1,2 @@
+system,decision_f1,policy_recall,traceability,unsupported_citations,evidence_consistency
+"No KG, LLM (dense RAG)",0.12154100782816364,0.07535923141186299,0.7015105601469238,0.0,0.19815079277036207

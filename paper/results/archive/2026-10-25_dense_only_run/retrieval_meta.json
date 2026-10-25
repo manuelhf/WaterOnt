@@ -1,0 +1,17 @@
+{
+ "generated": "2026-10-25 21:12",
+ "seed": 42,
+ "dense_model": "BAAI/bge-small-en-v1.5",
+ "llm_model": "claude-sonnet-5-5",
+ "llm_retrievers": [
+  "dense"
+ ],
+ "llm_run": true,
+ "no_recommendation_questions": {
+  "No KG, LLM (dense RAG)": 2
+ },
+ "versions": {
+  "anthropic": "2.3.0",
+  "sentence_transformers": "5.7.0"
+ }
+}

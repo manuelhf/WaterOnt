@@ -340,3 +340,62 @@ def test_api_errors_still_abort_in_strict_mode(built, monkeypatch):
     monkeypatch.setattr(gr, "_anthropic_client", _failing_client)
     with pytest.raises(RuntimeError, match="401"):
         GraphRAG(built.kg, use_llm=True, strict=True).ask("Which pipes should be replaced?")
+
+
+def _hash_embed(texts):
+    """Deterministic stand-in for a sentence-embedding model (character trigrams)."""
+    import hashlib
+    import numpy as np
+    out = np.zeros((len(texts), 256))
+    for i, t in enumerate(texts):
+        t = t.lower()
+        for j in range(len(t) - 2):
+            out[i, int(hashlib.md5(t[j:j + 3].encode()).hexdigest(), 16) % 256] += 1
+    return out
+
+
+def test_bm25_is_lexical_and_ranks_matches():
+    from wateront.retrieval import BM25Index
+    docs = [dict(id="a", text="cast iron main with three bursts"), dict(id="b", text="plastic service pipe"),
+            dict(id="c", text="cast iron valve chamber")]
+    idx = BM25Index(docs)
+    hits = [d["id"] for d, _ in idx.search("cast iron bursts", k=3)]
+    assert hits[0] == "a" and set(hits) == {"a", "c"}          # only term-sharing entries
+    assert idx.search("hospital", k=3) == []                    # no shared term: nothing
+
+
+def test_dense_retrieval_always_fills_the_context(built):
+    """Unlike lexical search, dense retrieval returns the top k even without shared terms."""
+    from wateront.baselines import FlatRAGBaseline
+    flat = FlatRAGBaseline(built.kg, use_llm=True, retriever="dense", embed=_hash_embed, query_prefix="q: ")
+    assert len(flat.index.search("Which pipes should be replaced?", k=40)) == 40
+    lexical = FlatRAGBaseline(built.kg, use_llm=True, retriever="tfidf")
+    assert flat.index is not lexical.index
+    with pytest.raises(ValueError, match="embed"):
+        FlatRAGBaseline(built.kg, use_llm=True, retriever="dense")
+
+
+def test_retrieval_analysis_counts_context(built):
+    import sys as _sys
+    _sys.path.insert(0, os.path.join(ROOT, "paper"))
+    import experiments_retrieval as ER
+    df = ER.retrieval_analysis(built, Config(), ["tfidf", "bm25", "dense"], embed=_hash_embed)
+    s = ER.summarise_retrieval(df)
+    assert set(s.index) == {"TF-IDF", "BM25", "dense"} and (df.reference_in_context <= df.pipe_records).all()
+    assert s.loc["dense", "questions_without_pipe_records"] == 0
+
+
+@needs_ltown
+def test_policy_precision_credits_correct_answers_beyond_the_top_k(ltown):
+    """A correct replacement outside the capped top-k reference earns no decision F1,
+    but full policy precision."""
+    from wateront.evaluation import INTENTS, reference, score
+    from wateront.graphrag import Answer, QueryPlan
+    from wateront.retrieval import Evidence
+    it = INTENTS[0]                                           # replacement
+    capped, full = reference(ltown.kg, it, Config()), reference(ltown.kg, it, Config(), capped=False)
+    beyond = [p for p, a, _ in full if p not in {q for q, _, _ in capped}]
+    assert beyond, "L-TOWN has 133 replacements, more than the cap of 25"
+    ans = Answer("q", QueryPlan(), [Evidence(beyond[0], {}, "Replacement", "R1", ["G-REPL-01"])], [], "")
+    sc = score(ltown.kg, ans, capped, full)
+    assert sc["decision_f1"] == 0.0 and sc["policy_precision"] == 1.0

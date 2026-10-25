@@ -21,6 +21,7 @@ For the latter, replace `reference()` with expert-labelled decisions via
 from __future__ import annotations
 
 import itertools
+import json
 from dataclasses import dataclass
 from typing import Callable
 
@@ -94,7 +95,11 @@ def default_intents(kg: KnowledgeGraph) -> list[Intent]:
     return out
 
 
-def reference(kg: KnowledgeGraph, intent: Intent, cfg: Config) -> list[tuple[str, str, list[str]]]:
+def reference(kg: KnowledgeGraph, intent: Intent, cfg: Config,
+              capped: bool = True) -> list[tuple[str, str, list[str]]]:
+    """Pipes satisfying the intent, with their policy action and clauses, ranked by action
+    urgency and priority. capped=True keeps the top_k (the ranked task scored by decision F1);
+    capped=False keeps every qualifying pipe (used by policy precision)."""
     rows = []
     for p in kg.nodes("Pipe"):
         f = pipe_facts(kg, p)
@@ -102,7 +107,7 @@ def reference(kg: KnowledgeGraph, intent: Intent, cfg: Config) -> list[tuple[str
         if intent.spec(f, d, cfg):
             rows.append((p, d.action, d.guidelines, f["priority"]))
     rows.sort(key=lambda r: (ACTION_RANK[r[1]], -r[3], r[0]))
-    return [(p, a, g) for p, a, g, _ in rows[: intent.top_k]]
+    return [(p, a, g) for p, a, g, _ in (rows[: intent.top_k] if capped else rows)]
 
 
 def load_expert_reference(path: str) -> dict[str, list[tuple[str, str, list[str]]]]:
@@ -120,7 +125,11 @@ def _traceable(kg: KnowledgeGraph, pipe_uid: str, cited: list[str]) -> bool:
     return bool(drs) and all(kg.has_edge(drs[0], "SUPPORTED_BY", g) for g in cited)
 
 
-def score(kg: KnowledgeGraph, ans: Answer, ref: list[tuple[str, str, list[str]]]) -> dict:
+def score(kg: KnowledgeGraph, ans: Answer, ref: list[tuple[str, str, list[str]]],
+          full_ref: list[tuple[str, str, list[str]]] | None = None) -> dict:
+    """Decision F1 scores the ranked task against the capped reference. Policy precision is the
+    share of returned (pipe, action) pairs that are correct under the policy for the question,
+    with no cap, so correct answers outside the top k are not penalised."""
     pred = {(e.pipe_uid, e.action) for e in ans.recommendations}
     gold = {(p, a) for p, a, _ in ref}
     tp = len(pred & gold)
@@ -133,7 +142,9 @@ def score(kg: KnowledgeGraph, ans: Answer, ref: list[tuple[str, str, list[str]]]
     return dict(n_ref=len(gold), n_pred=len(pred), decision_precision=prec, decision_recall=rec,
                 decision_f1=f1, policy_recall=sum(pr) / len(pr) if pr else float("nan"),
                 traceability=sum(tr) / len(tr) if tr else float("nan"),
-                unsupported_citations=len(ans.unsupported_citations))
+                unsupported_citations=len(ans.unsupported_citations),
+                policy_precision=(len(pred & {(p, a) for p, a, _ in full_ref}) / len(pred)
+                                  if full_ref is not None and pred else float("nan")))
 
 
 def jaccard(a: set, b: set) -> float:
@@ -148,6 +159,7 @@ def run_evaluation(kg: KnowledgeGraph, systems: dict, cfg: Config | None = None,
     skipped = []
     for it in intents or default_intents(kg):
         ref = expert[it.key] if expert and it.key in expert else reference(kg, it, cfg)
+        full_ref = None if expert and it.key in expert else reference(kg, it, cfg, capped=False)
         if not ref:   # an empty reference makes F1 meaningless; report instead of scoring
             skipped.append(it.key)
             continue
@@ -155,9 +167,11 @@ def run_evaluation(kg: KnowledgeGraph, systems: dict, cfg: Config | None = None,
             for i, q in enumerate(it.paraphrases):
                 ans = sysm.ask(q)
                 answers[(name, it.key, i)] = ans
-                rows.append(dict(system=name, intent=it.key, paraphrase=i, query=q, **score(kg, ans, ref),
+                rows.append(dict(system=name, intent=it.key, paraphrase=i, query=q, **score(kg, ans, ref, full_ref),
                                  planning_failed=bool(getattr(ans, "planning_failed", False)),
-                                 generator=ans.generator))
+                                 generator=ans.generator,
+                                 predictions=json.dumps([[e.pipe_uid, e.action, e.guidelines]
+                                                         for e in ans.recommendations])))
     if skipped:
         print(f"[eval] skipped intents with empty reference on this network: {skipped}")
     per_query = pd.DataFrame(rows)
@@ -168,7 +182,7 @@ def run_evaluation(kg: KnowledgeGraph, systems: dict, cfg: Config | None = None,
         cons.append(dict(system=name, intent=key,
                          evidence_consistency=sum(jaccard(a, b) for a, b in pairs) / len(pairs)))
     cons = pd.DataFrame(cons)
-    metrics = ["decision_f1", "policy_recall", "traceability", "unsupported_citations"]
+    metrics = ["decision_f1", "policy_recall", "traceability", "unsupported_citations", "policy_precision"]
     summary = per_query.groupby("system")[metrics].mean().join(
         cons.groupby("system")["evidence_consistency"].mean())
     order = [s for s in systems if s in summary.index]

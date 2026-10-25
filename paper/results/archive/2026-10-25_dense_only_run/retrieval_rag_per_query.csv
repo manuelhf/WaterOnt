@@ -1,0 +1,25 @@
+system,intent,paraphrase,query,n_ref,n_pred,decision_precision,decision_recall,decision_f1,policy_recall,traceability,unsupported_citations,planning_failed,generator,evidence_consistency
+"No KG, LLM (dense RAG)",replacement,0,"Which pipes should be replaced, and which standard authorises each replacement?",25,5,0.0,0.0,0.0,0.0,1.0,0,False,flat-llm,0.10365497076023393
+"No KG, LLM (dense RAG)",replacement,1,List the mains recommended for renewal together with the supporting policy.,25,12,0.16666666666666666,0.08,0.10810810810810811,0.08,1.0,0,False,flat-llm,0.10365497076023393
+"No KG, LLM (dense RAG)",replacement,2,Which assets have reached the end of their life and need to be swapped out?,25,11,0.2727272727272727,0.12,0.16666666666666666,0.12,1.0,0,False,flat-llm,0.10365497076023393
+"No KG, LLM (dense RAG)",rehabilitation,0,Which mains are candidates for rehabilitation?,25,3,0.6666666666666666,0.08,0.14285714285714285,0.04666666666666666,1.0,0,False,flat-llm,0.08831908831908832
+"No KG, LLM (dense RAG)",rehabilitation,1,Which deteriorated pipes should be relined rather than replaced?,25,3,0.3333333333333333,0.04,0.07142857142857142,0.02,1.0,0,False,flat-llm,0.08831908831908832
+"No KG, LLM (dense RAG)",rehabilitation,2,Where should we carry out structural rehabilitation this period?,25,7,0.14285714285714285,0.04,0.0625,0.04,1.0,0,False,flat-llm,0.08831908831908832
+"No KG, LLM (dense RAG)",inspection,0,Which pipes need an inspection?,25,9,0.0,0.0,0.0,0.0,0.1111111111111111,0,False,flat-llm,0.14058910026651963
+"No KG, LLM (dense RAG)",inspection,1,Which mains are overdue for a condition survey?,25,22,0.18181818181818182,0.16,0.1702127659574468,0.0,0.045454545454545456,0,False,flat-llm,0.14058910026651963
+"No KG, LLM (dense RAG)",inspection,2,Where should condition assessment crews be sent next?,25,15,0.13333333333333333,0.08,0.1,0.04,0.4666666666666667,0,False,flat-llm,0.14058910026651963
+"No KG, LLM (dense RAG)",critical_high_pof,0,Which hydraulically critical pipes also have a high failure probability?,25,4,0.0,0.0,0.0,0.0,0.75,0,False,flat-llm,0.21872571872571875
+"No KG, LLM (dense RAG)",critical_high_pof,1,Show backbone mains that are likely to fail.,25,2,0.5,0.04,0.07407407407407407,0.04,1.0,0,False,flat-llm,0.21872571872571875
+"No KG, LLM (dense RAG)",critical_high_pof,2,Find bottleneck pipes with a high or very high probability of failure.,25,4,0.0,0.0,0.0,0.0,0.75,0,False,flat-llm,0.21872571872571875
+"No KG, LLM (dense RAG)",critical_customers,0,"Which mains serving hospitals, schools or care homes need intervention?",19,15,0.8666666666666667,0.6842105263157895,0.7647058823529413,0.631578947368421,1.0,0,False,flat-llm,0.3279808959156785
+"No KG, LLM (dense RAG)",critical_customers,1,Which pipes supplying critical customers should be prioritised?,19,3,1.0,0.15789473684210525,0.2727272727272727,0.15789473684210525,1.0,0,False,flat-llm,0.3279808959156785
+"No KG, LLM (dense RAG)",critical_customers,2,Do any pipes feeding schools or hospitals require work?,19,8,1.0,0.42105263157894735,0.5925925925925926,0.42105263157894735,1.0,0,False,flat-llm,0.3279808959156785
+"No KG, LLM (dense RAG)",multimodal_pressure_age_policy,0,Which cast iron mains at low service pressure need intervention?,14,4,0.25,0.07142857142857142,0.11111111111111112,0.07142857142857142,0.25,0,False,flat-llm,0.1815126050420168
+"No KG, LLM (dense RAG)",multimodal_pressure_age_policy,1,Prioritise cast iron pipes with a low pressure margin.,14,3,0.0,0.0,0.0,0.0,1.0,0,False,flat-llm,0.1815126050420168
+"No KG, LLM (dense RAG)",multimodal_pressure_age_policy,2,Which old cast iron pipes with a pressure deficit require attention?,14,8,0.0,0.0,0.0,0.0,0.5,0,False,flat-llm,0.1815126050420168
+"No KG, LLM (dense RAG)",monitoring_gap,0,Which unmonitored hydraulically critical mains have intolerable risk?,25,25,0.28,0.28,0.28,0.14,0.0,0,False,flat-llm,0.19109062980030722
+"No KG, LLM (dense RAG)",monitoring_gap,1,Show critical pipes with intolerable risk and no pressure sensor nearby.,25,14,0.0,0.0,0.0,0.0,0.0,0,False,flat-llm,0.19109062980030722
+"No KG, LLM (dense RAG)",monitoring_gap,2,Where are the monitoring blind spots on high-risk backbone mains?,25,3,0.0,0.0,0.0,0.0,1.0,0,False,flat-llm,0.19109062980030722
+"No KG, LLM (dense RAG)",zone_prv3,0,Which pipes downstream of PRV-3 need intervention?,10,0,0.0,0.0,0.0,0.0,,0,False,flat-llm,0.3333333333333333
+"No KG, LLM (dense RAG)",zone_prv3,1,Prioritise work in the zone supplied through PRV-3.,10,25,0.0,0.0,0.0,0.0,0.56,0,False,flat-llm,0.3333333333333333
+"No KG, LLM (dense RAG)",zone_prv3,2,What maintenance is needed in the PRV-3 pressure zone?,10,0,0.0,0.0,0.0,0.0,,0,False,flat-llm,0.3333333333333333

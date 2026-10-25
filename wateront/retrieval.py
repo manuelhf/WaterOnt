@@ -26,11 +26,13 @@ BAND_PREFIX = {"pof": "FP", "hydraulic": "HC", "service": "SC", "overall": "OR",
 
 
 class VectorIndex:
+    """TF-IDF (default) or dense-embedding similarity search. Lexical search returns only
+    entries sharing at least one term with the query; dense search always returns the top k."""
     def __init__(self, docs: list[dict], text_key: str = "text",
-                 embed: Callable[[list[str]], np.ndarray] | None = None):
+                 embed: Callable[[list[str]], np.ndarray] | None = None, query_prefix: str = ""):
         self.docs = docs
         texts = [f"{d.get('title', '')}. {d[text_key]}" for d in docs]
-        self.embed = embed
+        self.embed, self.query_prefix = embed, query_prefix
         if embed is None:
             self.vec = TfidfVectorizer(stop_words="english", ngram_range=(1, 2), sublinear_tf=True)
             self.M = self.vec.fit_transform(texts)
@@ -42,10 +44,63 @@ class VectorIndex:
         if self.embed is None:
             sims = (self.M @ self.vec.transform([query]).T).toarray().ravel()
         else:
-            q = np.asarray(self.embed([query]), dtype=float).ravel()
+            q = np.asarray(self.embed([self.query_prefix + query]), dtype=float).ravel()
             sims = self.M @ (q / np.linalg.norm(q))
-        order = np.argsort(-sims)[:k]
+            order = np.argsort(-sims, kind="stable")[:k]
+            return [(self.docs[i], float(sims[i])) for i in order]
+        order = np.argsort(-sims, kind="stable")[:k]
         return [(self.docs[i], float(sims[i])) for i in order if sims[i] > 0]
+
+
+class BM25Index:
+    """Okapi BM25 (k1 = 1.5, b = 0.75) over the same tokens as the TF-IDF index (lower case,
+    English stop words removed). Like any lexical method, it returns only entries that share
+    at least one term with the query."""
+    def __init__(self, docs: list[dict], text_key: str = "text", k1: float = 1.5, b: float = 0.75):
+        from sklearn.feature_extraction.text import CountVectorizer
+        self.docs, self.k1, self.b = docs, k1, b
+        texts = [f"{d.get('title', '')}. {d[text_key]}" for d in docs]
+        self.vec = CountVectorizer(stop_words="english")
+        self.tf = self.vec.fit_transform(texts).tocsc().astype(float)
+        n = self.tf.shape[0]
+        df = np.asarray((self.tf > 0).sum(axis=0)).ravel()
+        self.idf = np.log(1 + (n - df + 0.5) / (df + 0.5))
+        self.len = np.asarray(self.tf.sum(axis=1)).ravel()
+        self.avg = self.len.mean()
+
+    def search(self, query: str, k: int = 3) -> list[tuple[dict, float]]:
+        terms = [self.vec.vocabulary_[t] for t in self.vec.build_analyzer()(query) if t in self.vec.vocabulary_]
+        scores = np.zeros(len(self.docs))
+        norm = self.k1 * (1 - self.b + self.b * self.len / self.avg)
+        for j in set(terms):
+            f = self.tf[:, j].toarray().ravel()
+            scores += self.idf[j] * f * (self.k1 + 1) / (f + norm)
+        order = np.argsort(-scores, kind="stable")[:k]
+        return [(self.docs[i], float(scores[i])) for i in order if scores[i] > 0]
+
+
+DENSE_MODEL = "BAAI/bge-small-en-v1.5"
+DENSE_QUERY_PREFIX = "Represent this sentence for searching relevant passages: "
+
+
+def sentence_transformer_embedder(model_name: str = DENSE_MODEL):
+    """Dense embeddings via sentence-transformers (downloads the model on first use)."""
+    from sentence_transformers import SentenceTransformer
+    model = SentenceTransformer(model_name)
+    return lambda texts: model.encode(list(texts), normalize_embeddings=True, show_progress_bar=False)
+
+
+def make_index(docs: list[dict], retriever: str = "tfidf", embed=None, query_prefix: str = ""):
+    """retriever: 'tfidf' | 'bm25' | 'dense' (dense needs `embed`, a texts -> vectors callable)."""
+    if retriever == "tfidf":
+        return VectorIndex(docs)
+    if retriever == "bm25":
+        return BM25Index(docs)
+    if retriever == "dense":
+        if embed is None:
+            raise ValueError("dense retrieval needs an embed function, e.g. sentence_transformer_embedder()")
+        return VectorIndex(docs, embed=embed, query_prefix=query_prefix)
+    raise ValueError(f"unknown retriever {retriever!r}")
 
 
 @dataclass

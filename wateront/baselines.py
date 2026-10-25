@@ -104,15 +104,19 @@ class FlatRAGBaseline:
     name = "Flat-document RAG"
 
     def __init__(self, kg: KnowledgeGraph, cfg: Config | None = None, use_llm: bool = False,
-                 k_cards: int = 40):
+                 k_cards: int = 40, retriever: str = "tfidf", embed=None, query_prefix: str = ""):
+        """retriever: how the 40 most similar entries are found in the combined index of pipe
+        descriptions and policy clauses ('tfidf', 'bm25' or 'dense'). Nothing else changes."""
         self.kg, self.cfg, self.use_llm, self.k_cards = kg, cfg or Config(), use_llm, k_cards
+        self.retriever = retriever
         if use_llm:
             self.name = "Flat-document RAG + LLM"
         self.facts = {p: pipe_facts(kg, p) for p in kg.nodes("Pipe")}
         self.guidelines = [kg.node(g) for g in kg.nodes("EngineeringGuideline")]
         docs = [dict(id=p, kind="asset", title="", text=asset_card(f)) for p, f in self.facts.items()]
         docs += [dict(id=g["id"], kind="policy", title=g["title"], text=g["text"]) for g in self.guidelines]
-        self.index = VectorIndex(docs)
+        from .retrieval import make_index
+        self.index = make_index(docs, retriever, embed=embed, query_prefix=query_prefix)
         self.policy_index = VectorIndex([g for g in self.guidelines if g["topic"] in TOPIC_ACTION])
 
     def ask(self, query: str) -> Answer:
