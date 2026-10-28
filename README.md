@@ -16,9 +16,12 @@ WaterOnt is research software under active development: it runs on any EPANET mo
 recommendations follow an illustrative policy and, unless you supply your own records,
 synthetic asset histories. Use it to explore and to give feedback, not for operational decisions.
 
-1. **Convert your model.** Open the [one-click converter](https://colab.research.google.com/github/manuelhf/WaterOnt/blob/main/demo/WaterOnt_convert.ipynb) in Google Colab, run step 1, then step 2, and select your `.inp` together with any of: an asset register or inspection log, a failure list, a sensor layout, critical customers. The `.json` downloads automatically, with a summary of what came from your files and what is still synthetic.
-2. **Open it** in the [explorer](https://manuelhf.github.io/WaterOnt/) with **Open network file (.json)…**. The file is read in your browser and not uploaded anywhere.
-3. **Add or update data later** in the explorer's Data tab: *Import asset register* also accepts inspection logs, and sensor layouts can be imported or edited on the map.
+1. **In the [explorer](https://manuelhf.github.io/WaterOnt/), press _Use my EPANET model (.inp)…_** and choose your `.inp`, plus any CSV files you have: an asset register or inspection log, a failure list, a sensor layout, critical customers.
+2. **Press _Copy code_, then _Open Google Colab_**, paste into the empty cell and run it (a Google account is needed; about a minute). Your files travel inside the code and are processed only in your own Colab session; Colab then downloads a network file (`.json`) with a summary of what came from your files and what is still synthetic.
+3. **Back in the explorer, press _Open the downloaded file_.** The file is read in your browser and not uploaded anywhere. *Back to the L-TOWN demo* (or reloading the page) returns to the demo.
+4. **Add or update data later** in the explorer's Data tab: *Import asset register* also accepts inspection logs, and sensor layouts can be imported or edited on the map.
+
+Prefer a reusable notebook? The [converter notebook](https://colab.research.google.com/github/manuelhf/WaterOnt/blob/main/demo/WaterOnt_convert.ipynb) does the same with an upload button, and `python -m wateront convert model.inp register.csv` does it on your own computer.
 
 Files do not have to follow the templates in [`data/`](data/) exactly: column names such as "Pipe ID", "Last inspection" or "Installation year" are recognised; dates can stand in for years; materials can be written as names ("cast iron", "uPVC", "MDPE"); Excel CSV files with commas, semicolons or tabs all work. An inspection log may list a pipe several times: the most recent inspection wins. A file with any invalid value is rejected as a whole, with every problem listed, so a register is never half-applied.
 

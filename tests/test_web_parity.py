@@ -246,3 +246,51 @@ console.log(JSON.stringify(parseSensors(fs.readFileSync(process.argv[3], 'utf8')
                                    capture_output=True, text=True, check=True).stdout)
     assert not js["errors"], js["errors"]
     assert {k: sorted(v) for k, v in js["layout"].items()} == {k: sorted(c for c, _ in v) for k, v in py.items()}
+
+
+def test_colab_code_from_the_page_converts_the_users_model(tmp_path):
+    """The explorer's 'Use my EPANET model' code (files embedded, gzip + base64) restores the
+    files byte for byte in Colab and yields the same network file as a direct conversion."""
+    import glob
+    import sys
+    import types
+    import wntr
+    from wateront.convert import convert
+    inp = glob.glob(os.path.join(os.path.dirname(wntr.__file__), "library", "**", "Net3.inp"), recursive=True)[0]
+    log = os.path.join(ROOT, "tests", "fixtures", "inspection_log.csv")
+    tpl = open(os.path.join(ROOT, "wateront", "web_template.html"), encoding="utf-8").read()
+    logic = re.search(r"// LOGIC START[^\n]*\n(.*?)// LOGIC END", tpl, re.S).group(1)
+    (tmp_path / "g.js").write_text(logic + """
+const fs = require('fs');
+(async () => {
+  const files = process.argv.slice(3).map(p => ({ name: p.split('/').pop(), bytes: new Uint8Array(fs.readFileSync(p)) }));
+  fs.writeFileSync(process.argv[2], await colabCode(files));
+})();
+""")
+    cell = tmp_path / "cell.py"
+    subprocess.run(["node", str(tmp_path / "g.js"), str(cell), inp, log], check=True)
+    code = cell.read_text()
+    assert len(code) < os.path.getsize(inp)                       # compressed
+    work = tmp_path / "colab"
+    code = code.replace("INSTALL = True", "INSTALL = False").replace('work = "/content/wateront"', f'work = r"{work}"')
+    downloaded = []
+    colab = types.ModuleType("google.colab"); colab.files = types.SimpleNamespace(download=downloaded.append)
+    saved = {k: sys.modules.get(k) for k in ("google", "google.colab")}
+    sys.modules["google"], sys.modules["google.colab"] = types.ModuleType("google"), colab
+    env_path = os.environ.get("PYTHONPATH")
+    os.environ["PYTHONPATH"] = ROOT + (os.pathsep + env_path if env_path else "")
+    try:
+        exec(compile(code, "colab_cell", "exec"), {})
+    finally:
+        for k, v in saved.items():
+            if v is None:
+                sys.modules.pop(k, None)
+            else:
+                sys.modules[k] = v
+        if env_path is None:
+            os.environ.pop("PYTHONPATH", None)
+        else:
+            os.environ["PYTHONPATH"] = env_path
+    assert open(work / "Net3.inp", "rb").read() == open(inp, "rb").read()
+    ref, _ = convert([inp, log], out_dir=str(tmp_path / "ref"))
+    assert downloaded and json.load(open(downloaded[0])) == json.load(open(ref))

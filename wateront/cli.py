@@ -58,6 +58,12 @@ def main(argv=None) -> None:
     w.add_argument("--seed", type=int, default=42)
     w.add_argument("--json", action="store_true", help="write a network file for the page's “Open network” button instead")
 
+    c = sub.add_parser("convert", help="EPANET model + optional CSV files -> network file for the explorer")
+    c.add_argument("files", nargs="+", help="one .inp and any asset register / inspection log, failure list, "
+                                            "sensor layout or critical customers CSV (recognised by their columns)")
+    c.add_argument("--out-dir", default=".")
+    c.add_argument("--seed", type=int, default=42)
+
     args = ap.parse_args(argv)
 
     if args.cmd == "build":
@@ -90,6 +96,16 @@ def main(argv=None) -> None:
             print(f"wrote {write_json(res, out, cfg)} (open it with the explorer's “Open network” button)")
         else:
             print(f"wrote {write_web(res, args.out, cfg)} (open it in any browser; no server needed)")
+
+    elif args.cmd == "convert":
+        import sys
+        from .convert import convert
+        try:
+            _, summary = convert(args.files, out_dir=args.out_dir, seed=args.seed)
+        except ValueError as err:
+            print(f"Nothing was converted: {err}")
+            sys.exit(1)
+        print("\n".join(summary))
 
     elif args.cmd == "ask":
         from .graphrag import GraphRAG

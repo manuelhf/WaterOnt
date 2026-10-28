@@ -94,12 +94,17 @@ svg#map.placing { cursor: crosshair; }
   padding: 8px 10px 8px 14px; border-radius: 8px; font-size: 14px; display: flex; gap: 12px; align-items: center; max-width: calc(100% - 100px);
 }
 .banner[hidden] { display: none; }
-dialog#claudeDlg { border: 1px solid var(--line); border-radius: 12px; background: var(--surface); color: var(--ink); width: min(560px, calc(100% - 32px)); padding: 20px; }
-dialog#claudeDlg::backdrop { background: rgba(15, 26, 32, .45); }
-dialog#claudeDlg h2 { margin: 0 0 6px; font-size: 18px; }
-dialog#claudeDlg p { font-size: 14px; margin: 0 0 10px; }
-dialog#claudeDlg label { font-weight: 600; font-size: 14px; }
-dialog#claudeDlg textarea { width: 100%; margin: 4px 0 8px; padding: 8px; border: 1px solid var(--line); border-radius: 8px; background: var(--bg); color: var(--ink); font: inherit; font-size: 14px; }
+dialog#claudeDlg, dialog#inpDlg { border: 1px solid var(--line); border-radius: 12px; background: var(--surface); color: var(--ink); width: min(560px, calc(100% - 32px)); padding: 20px; }
+dialog#claudeDlg::backdrop, dialog#inpDlg::backdrop { background: rgba(15, 26, 32, .45); }
+dialog#claudeDlg h2, dialog#inpDlg h2 { margin: 0 0 6px; font-size: 18px; }
+dialog#claudeDlg p, dialog#inpDlg p { font-size: 14px; margin: 0 0 10px; }
+dialog#claudeDlg label, dialog#inpDlg label { font-weight: 600; font-size: 14px; }
+dialog#claudeDlg textarea, dialog#inpDlg textarea { width: 100%; margin: 4px 0 8px; padding: 8px; border: 1px solid var(--line); border-radius: 8px; background: var(--bg); color: var(--ink); font: inherit; font-size: 14px; }
+dialog#inpDlg ol.steps { margin: 4px 0 12px; padding-left: 20px; font-size: 14px; }
+dialog#inpDlg ol.steps li { margin-bottom: 6px; }
+dialog#inpDlg label { display: block; margin-top: 8px; }
+dialog#inpDlg input[type=file] { margin: 4px 0 2px; font: inherit; font-size: 14px; max-width: 100%; }
+dialog#inpDlg .btnrow { flex-wrap: wrap; gap: 8px; margin-top: 12px; }
 .hint { color: var(--ink-2); font-size: 13px; }
 .dl { background: none; border: 0; color: var(--accent); text-decoration: underline; cursor: pointer; padding: 0; font-size: 13.5px; }
 #loadStatus:empty { display: none; }
@@ -237,6 +242,7 @@ footer.note { font-size: 12.5px; color: var(--ink-2); padding: 12px 20px; border
     </label>
     <label><input type="checkbox" id="showSensors" checked> Show sensors</label>
     <button class="btn quiet" id="openBtn" type="button" title="Open a WaterOnt network file (.json). To use your own EPANET model (.inp), convert it first with the one-click Colab converter. The file stays on your computer.">Open network file (.json)…</button>
+    <button class="btn quiet" id="inpBtn" type="button" title="Analyse your own EPANET model: WaterOnt prepares the code to run in Google Colab, which returns a network file to open here.">Use my EPANET model (.inp)…</button>
     <details class="menu" id="saveMenu">
       <summary class="btn quiet">Save…</summary>
       <div class="menu-list" role="menu">
@@ -357,6 +363,25 @@ footer.note { font-size: 12.5px; color: var(--ink-2); padding: 12px 20px; border
   </aside>
 </div>
 
+<dialog id="inpDlg">
+  <form method="dialog">
+    <h2>Use your own EPANET model</h2>
+    <ol class="steps">
+      <li><b>Choose your files.</b> Your model (.inp) and, if you have them, CSV files with your data: an asset register or inspection log, a failure list, a sensor layout, or critical customers. Column names need not match the templates exactly.</li>
+      <li><b>Copy the code and run it in Google Colab.</b> Press <i>Copy code</i>, then <i>Open Google Colab</i>, paste into the empty cell (Ctrl+V, ⌘V on a Mac) and run it (Shift+Enter). It needs a Google account and takes about a minute. Your files are inside the code and are processed only in your own Colab session.</li>
+      <li><b>Open the result here.</b> Colab downloads a network file (.json): open it with <i>Open the downloaded file</i>.</li>
+    </ol>
+    <label for="inpModel">Your model (.inp)</label>
+    <input type="file" id="inpModel" accept=".inp">
+    <p id="inpChosen" class="hint"></p>
+    <label for="inpData">Your data (optional CSV files)</label>
+    <input type="file" id="inpData" accept=".csv,text/csv" multiple>
+    <div id="inpFallback" hidden><p class="hint">Copying was blocked by the browser. Select all of this code, copy it, and paste it into Colab:</p><textarea id="inpText" rows="8" readonly></textarea></div>
+    <div class="btnrow"><button class="btn" type="button" id="inpCopy">Copy code</button><button class="btn quiet" type="button" id="inpColab">Open Google Colab</button><button class="btn quiet" type="button" id="inpOpen">Open the downloaded file…</button><button class="btn quiet" value="cancel">Close</button></div>
+    <p id="inpStatus" class="hint" role="status"></p>
+    <p class="hint">Prefer a reusable notebook? Use the <a href="https://colab.research.google.com/github/manuelhf/WaterOnt/blob/main/demo/WaterOnt_convert.ipynb" target="_blank" rel="noopener">converter notebook</a> instead.</p>
+  </form>
+</dialog>
 <dialog id="claudeDlg">
   <form method="dialog" id="claudeForm">
     <h2>Ask Claude about this</h2>
@@ -667,6 +692,59 @@ function parseSensors(text, D) {
   });
   return { errors, layout };
 }
+// --- Colab code for a user's own model: the files travel inside the code (gzip + base64),
+// so nothing is uploaded anywhere except into the user's own Colab session.
+async function gzipBytes(bytes) {
+  if (typeof CompressionStream === "undefined") return bytes;          // old browsers: uncompressed
+  const stream = new Blob([bytes]).stream().pipeThrough(new CompressionStream("gzip"));
+  return new Uint8Array(await new Response(stream).arrayBuffer());
+}
+function toBase64(bytes) {
+  let s = ""; for (let i = 0; i < bytes.length; i += 0x8000) s += String.fromCharCode.apply(null, bytes.subarray(i, i + 0x8000));
+  return btoa(s);
+}
+async function colabCode(files) {
+  // files: [{ name, bytes: Uint8Array }], the .inp first
+  const safe = n => n.replace(/[^A-Za-z0-9._ -]/g, "_").replace(/^\.+/, "") || "file";
+  const lines = [];
+  for (const f of files) {
+    const b64 = toBase64(await gzipBytes(f.bytes)), parts = [];
+    for (let i = 0; i < b64.length; i += 10000) parts.push(`        "${b64.slice(i, i + 10000)}"`);
+    lines.push(`    ${JSON.stringify(safe(f.name))}: (\n${parts.join("\n")}\n    ),`);
+  }
+  return `# WaterOnt: turn your EPANET model into a network file for the WaterOnt explorer.
+# Paste this whole cell into Google Colab and run it (Shift+Enter); it takes about a minute.
+# Your files are inside this code and are processed in your own Colab session only.
+import base64, gzip, os, subprocess, sys
+INSTALL = True
+FILES = {
+${lines.join("\n")}
+}
+if INSTALL:
+    print("Installing WaterOnt (about a minute)...")
+    subprocess.run([sys.executable, "-m", "pip", "install", "-q", "numpy>=2.0,<2.3",
+                    "git+https://github.com/manuelhf/WaterOnt.git"], check=True)
+work = "/content/wateront"
+os.makedirs(work, exist_ok=True)
+paths = []
+for name, text in FILES.items():
+    data = base64.b64decode(text)
+    if data[:2] == b"\\x1f\\x8b":
+        data = gzip.decompress(data)
+    path = os.path.join(work, name)
+    with open(path, "wb") as fh:
+        fh.write(data)
+    paths.append(path)
+run = subprocess.run([sys.executable, "-m", "wateront", "convert", *paths, "--out-dir", work],
+                     capture_output=True, text=True)
+print(run.stdout.strip() or run.stderr.strip()[-2000:])
+out = os.path.join(work, os.path.splitext(list(FILES)[0])[0] + "_wateront.json")
+if run.returncode == 0 and os.path.exists(out):
+    from google.colab import files
+    files.download(out)
+    print("\\nDownloaded. Back in the explorer, choose 'Open network file (.json)...' and pick this file.")
+`;
+}
 function applySensorLayout(D, layout) {
   D.nodes.forEach(nd => { nd[4] = (layout[nd[0]] || []).slice(); });
   D.pipes.forEach(p => { p.sensors = (layout[p.id] || []).slice(); });
@@ -684,20 +762,63 @@ function openNetwork(D, label) {
   document.getElementById("loadStatus").textContent = label || "";
 }
 const esc0 = s => String(s).replace(/[&<>"]/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]));
+function showBackToDemo() {
+  if (!DATA_PRISTINE) return;
+  const st = document.getElementById("loadStatus"), name = JSON.parse(DATA_PRISTINE).network;
+  const b = document.createElement("button");
+  b.type = "button"; b.className = "btn quiet"; b.id = "backDemo"; b.style.marginLeft = "8px";
+  b.textContent = `Back to the ${name} demo`;
+  b.onclick = () => {
+    if (window.__woDirty && window.__woDirty() && !confirm("Going back to the demo discards your unsaved edits. Continue?")) return;
+    openNetwork(JSON.parse(DATA_PRISTINE), `Back to the ${name} demo.`);
+  };
+  st.appendChild(b);
+}
 async function loadFile(file) {
   const st = document.getElementById("loadStatus");
   try {
     if (window.__woDirty && window.__woDirty() && !confirm("Opening another network discards your unsaved edits. Continue?")) return;
-    if (/\.inp$/i.test(file.name)) {
-      st.innerHTML = `${esc0(file.name)} is an EPANET model. Convert it first with the <a href="https://colab.research.google.com/github/manuelhf/WaterOnt/blob/main/demo/WaterOnt_convert.ipynb" target="_blank" rel="noopener">one-click converter in Google Colab</a> (upload the .inp, optionally your asset register or inspection log, press Run, download the .json), then open the .json here.`;
-      return;
-    }
+    if (/\.inp$/i.test(file.name)) { openInpDialog(file); return; }
     openNetwork(JSON.parse(await file.text()), `Opened ${file.name}. The file was read in your browser and not uploaded anywhere.`);
+    showBackToDemo();
   } catch (err) {
     st.textContent = `Couldn’t open ${file.name}: ${err.message}`;
   }
 }
 document.getElementById("openBtn").onclick = () => document.getElementById("openFile").click();
+let inpPicked = null;
+function openInpDialog(file) {
+  inpPicked = file || null;
+  document.getElementById("inpChosen").textContent = inpPicked ? `Chosen: ${inpPicked.name}` : "";
+  document.getElementById("inpStatus").textContent = "";
+  document.getElementById("inpFallback").hidden = true;
+  document.getElementById("inpDlg").showModal();
+}
+document.getElementById("inpBtn").onclick = () => openInpDialog();
+document.getElementById("inpModel").onchange = e => {
+  if (e.target.files[0]) { inpPicked = e.target.files[0]; document.getElementById("inpChosen").textContent = `Chosen: ${inpPicked.name}`; }
+};
+document.getElementById("inpColab").onclick = () => window.open("https://colab.research.google.com/#create=true", "_blank", "noopener");
+document.getElementById("inpOpen").onclick = () => { document.getElementById("inpDlg").close(); document.getElementById("openFile").click(); };
+document.getElementById("inpCopy").onclick = async () => {
+  const st = document.getElementById("inpStatus");
+  if (!inpPicked) { st.textContent = "Choose your model (.inp) first."; return; }
+  const extra = [...document.getElementById("inpData").files];
+  st.textContent = "Preparing the code…";
+  const files = [];
+  for (const f of [inpPicked, ...extra]) files.push({ name: f.name, bytes: new Uint8Array(await f.arrayBuffer()) });
+  const code = await colabCode(files), kb = Math.round(code.length / 1024);
+  const what = `${inpPicked.name}${extra.length ? ` and ${extra.length} data file(s)` : ""}`;
+  if (code.length > 20e6) { st.textContent = `The code is very large (${kb} KB) and may be slow to paste; consider the converter notebook instead.`; }
+  try {
+    await navigator.clipboard.writeText(code);
+    st.textContent = `Code copied (${kb} KB, containing ${what}). Now open Google Colab, paste and run.`;
+  } catch (err) {
+    const ta = document.getElementById("inpText");
+    ta.value = code; document.getElementById("inpFallback").hidden = false; ta.focus(); ta.select();
+    st.textContent = `The code for ${what} is in the box above: copy it, then open Google Colab, paste and run.`;
+  }
+};
 document.getElementById("openFile").onchange = e => { if (e.target.files[0]) loadFile(e.target.files[0]); e.target.value = ""; };
 document.addEventListener("dragover", e => { e.preventDefault(); document.body.classList.add("dropping"); });
 document.addEventListener("dragleave", e => { if (!e.relatedTarget) document.body.classList.remove("dropping"); });
@@ -705,6 +826,7 @@ document.addEventListener("drop", e => {
   e.preventDefault(); document.body.classList.remove("dropping");
   if (e.dataTransfer.files[0]) loadFile(e.dataTransfer.files[0]);
 });
+const DATA_PRISTINE = DATA ? JSON.stringify(DATA) : null;   // the demo as shipped, for "Back to the demo"
 if (DATA) openNetwork(DATA);
 
 function main(D) {
