@@ -38,6 +38,9 @@ class QueryPlan:
     unmonitored: bool = False
     pipes: list[str] = field(default_factory=list)
     junctions: list[str] = field(default_factory=list)
+    min_diameter: float | None = None   # mm, strict: "above 150 mm"
+    max_diameter: float | None = None   # mm, strict: "below 150 mm"
+    order_by: str | None = None         # "diameter_asc" | "diameter_desc"; default: urgency, then risk
     top_k: int = 25
 
 
@@ -86,7 +89,25 @@ def plan_rules(q: str) -> QueryPlan:
     p.junctions = re.findall(r"\bjunction\s+([A-Za-z0-9_\-]+)", q)
     if m := re.search(r"\btop\s+(\d+)", s):
         p.top_k = int(m.group(1))
+    p.min_diameter, p.max_diameter, p.order_by = diameter_terms(s)
     return p
+
+
+DIA_ABOVE = r"\b(?:above|over|greater than|larger than|bigger than|more than|wider than)\s*(\d+(?:\.\d+)?)\s*mm\b"
+DIA_BELOW = r"\b(?:below|under|less than|smaller than|narrower than)\s*(\d+(?:\.\d+)?)\s*mm\b"
+
+
+def diameter_terms(s: str) -> tuple[float | None, float | None, str | None]:
+    """Diameter bounds in mm and an optional ordering; mirrored in the web explorer."""
+    lo = float(m.group(1)) if (m := re.search(DIA_ABOVE, s)) else None
+    hi = float(m.group(1)) if (m := re.search(DIA_BELOW, s)) else None
+    order = None
+    if re.search(r"\b(diameters?|bores?)\b", s):
+        if re.search(r"\b(small\w*|narrow\w*|thin\w*|minimum)\b", s):
+            order = "diameter_asc"
+        elif re.search(r"\b(larg\w*|big\w*|wide\w*|maximum)\b", s):
+            order = "diameter_desc"
+    return lo, hi, order
 
 
 PLANNER_PROMPT = """Convert the engineer's question into a JSON query plan for a water-network
@@ -217,8 +238,15 @@ class GraphRAG:
             cand &= r.pipes_in_zone(z)
             for pid in cand:
                 prefix.setdefault(pid, []).append((pid, "IN_ZONE", z))
-        evs = [r.evidence(p, prefix.get(p)) for p in cand]
-        return r.rank(evs)[: plan.top_k]
+        dia = lambda pid: round(kg.node(pid)["diameter"])     # whole mm, as in the explorer
+        if plan.min_diameter is not None:
+            cand = {p for p in cand if dia(p) > plan.min_diameter}
+        if plan.max_diameter is not None:
+            cand = {p for p in cand if dia(p) < plan.max_diameter}
+        ranked = r.rank([r.evidence(p, prefix.get(p)) for p in cand])
+        if plan.order_by in ("diameter_asc", "diameter_desc"):     # stable: urgency breaks ties
+            ranked.sort(key=lambda e: dia(e.pipe_uid), reverse=plan.order_by == "diameter_desc")
+        return ranked[: plan.top_k]
 
     # -------------------------------------------------------------------- ask
     def ask(self, query: str, plan: QueryPlan | None = None) -> Answer:

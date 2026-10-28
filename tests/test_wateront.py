@@ -399,3 +399,49 @@ def test_policy_precision_credits_correct_answers_beyond_the_top_k(ltown):
     ans = Answer("q", QueryPlan(), [Evidence(beyond[0], {}, "Replacement", "R1", ["G-REPL-01"])], [], "")
     sc = score(ltown.kg, ans, capped, full)
     assert sc["decision_f1"] == 0.0 and sc["policy_precision"] == 1.0
+
+
+class _FakeNeo4j:
+    """Records the Cypher statements a push would send, and simulates the WNO-node deletion."""
+    def __init__(self, existing=0):
+        self.statements, self.existing = [], existing
+        outer = self
+        class _Session:
+            def __enter__(self): return self
+            def __exit__(self, *a): return False
+            def run(self, q, **kw):
+                outer.statements.append(q)
+                if q.startswith("MATCH (n:WNO) WITH n LIMIT"):
+                    c = min(10000, outer.existing); outer.existing -= c
+                    return types.SimpleNamespace(single=lambda: {"c": c})
+                return types.SimpleNamespace(single=lambda: None)
+        self._Session = _Session
+    def driver(self, *a, **k):
+        return types.SimpleNamespace(session=lambda database=None: self._Session(), close=lambda: None)
+
+
+def _push(built, monkeypatch, fake, **kw):
+    import sys as _sys
+    neo4j = types.ModuleType("neo4j"); neo4j.GraphDatabase = types.SimpleNamespace(driver=fake.driver)
+    monkeypatch.setitem(_sys.modules, "neo4j", neo4j)
+    return built.kg.to_neo4j("bolt://x", "u", "p", **kw)
+
+
+def test_neo4j_push_replaces_the_previous_graph_by_default(built, monkeypatch):
+    """A second push must not merge with the first: stale relationships would give pipes two
+    actions or two risk classes. Default: delete WNO nodes (only) before loading."""
+    fake = _FakeNeo4j(existing=25000)
+    removed = _push(built, monkeypatch, fake)
+    assert removed == 25000 and fake.existing == 0
+    first_merge = next(i for i, q in enumerate(fake.statements) if "MERGE" in q)
+    assert all(q.startswith("MATCH (n:WNO)") for q in fake.statements[:3])       # deletes before loading
+    assert first_merge > 3 and not any(q == "MATCH (n) DETACH DELETE n" for q in fake.statements)
+
+
+def test_neo4j_keep_existing_and_wipe_options(built, monkeypatch):
+    keep = _FakeNeo4j(existing=100)
+    assert _push(built, monkeypatch, keep, keep_existing=True) == 0 and keep.existing == 100
+    assert not any("DETACH DELETE" in q for q in keep.statements)
+    wipe = _FakeNeo4j()
+    _push(built, monkeypatch, wipe, wipe=True)
+    assert wipe.statements[0] == "MATCH (n) DETACH DELETE n"

@@ -28,7 +28,9 @@ def main(argv=None) -> None:
     b.add_argument("--out", default="kg.pkl")
     b.add_argument("--ttl", help="also export instance RDF (Turtle)")
     b.add_argument("--neo4j", help="bolt URI; credentials from NEO4J_USER / NEO4J_PASSWORD")
-    b.add_argument("--wipe", action="store_true", help="delete existing Neo4j data first")
+    b.add_argument("--wipe", action="store_true", help="delete ALL existing Neo4j data first")
+    b.add_argument("--keep-existing", action="store_true",
+                   help="merge into the existing WaterOnt graph instead of replacing it (not recommended)")
     b.add_argument("--seed", type=int, default=42)
 
     a = sub.add_parser("ask", help="Ask the GraphRAG engine a question")
@@ -69,9 +71,12 @@ def main(argv=None) -> None:
             to_rdf(res.kg).serialize(args.ttl, format="turtle")
             print(f"saved {args.ttl}")
         if args.neo4j:
-            res.kg.to_neo4j(args.neo4j, os.environ.get("NEO4J_USER", "neo4j"),
-                            os.environ.get("NEO4J_PASSWORD", "password"), wipe=args.wipe)
-            print(f"pushed to {args.neo4j}")
+            removed = res.kg.to_neo4j(args.neo4j, os.environ.get("NEO4J_USER", "neo4j"),
+                                      os.environ.get("NEO4J_PASSWORD", "password"), wipe=args.wipe,
+                                      keep_existing=args.keep_existing)
+            note = ("merged into the existing graph" if args.keep_existing else
+                    "database wiped first" if args.wipe else f"replaced the previous WaterOnt graph ({removed} nodes)")
+            print(f"pushed to {args.neo4j}: {note}")
 
     elif args.cmd == "web":
         from .pipeline import build_knowledge_graph

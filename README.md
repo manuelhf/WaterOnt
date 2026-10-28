@@ -37,7 +37,7 @@ python -m pytest -q tests
 
 `Net1`, `Net3` and `Net6` ship with WNTR; L-TOWN is included in `data/networks/` (see the L-TOWN section).
 
-Install as a package with `pip install -e .` (extras: `.[llm]`, `.[neo4j]`, `.[demo]`). Optional extras: `--neo4j bolt://localhost:7687` on `build` (credentials from `NEO4J_USER`/`NEO4J_PASSWORD`), and `--llm` on `ask`/`evaluate` to use Claude for planning, generation and an additional LLM-based flat-RAG baseline (needs `ANTHROPIC_API_KEY`; model set in `Config.llm_model`). Real data plugs in through `--assets` (see `data/asset_register_template.csv`, which overrides priors pipe by pipe) and `--guidelines` (see `data/guidelines_template.json`).
+Install as a package with `pip install -e .` (extras: `.[llm]`, `.[neo4j]`, `.[demo]`). Optional extras: `--neo4j bolt://localhost:7687` on `build` (credentials from `NEO4J_USER`/`NEO4J_PASSWORD`; each push replaces the previous WaterOnt graph, leaving any other data in the database untouched, so a rebuilt graph never mixes with an old one; `--keep-existing` merges instead, `--wipe` clears the whole database), and `--llm` on `ask`/`evaluate` to use Claude for planning, generation and an additional LLM-based flat-RAG baseline (needs `ANTHROPIC_API_KEY`; model set in `Config.llm_model`). Real data plugs in through `--assets` (see `data/asset_register_template.csv`, which overrides priors pipe by pipe) and `--guidelines` (see `data/guidelines_template.json`).
 
 ## Results produced by this code (deterministic mode, seed 42)
 

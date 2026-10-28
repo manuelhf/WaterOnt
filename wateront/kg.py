@@ -121,7 +121,13 @@ class KnowledgeGraph:
     ]
 
     def to_neo4j(self, uri: str, user: str, password: str, database: str | None = None,
-                 wipe: bool = False, batch: int = 500) -> None:
+                 wipe: bool = False, batch: int = 500, keep_existing: bool = False) -> int:
+        """Push the graph to Neo4j. By default the previous WaterOnt graph (nodes labelled WNO)
+        is removed first, so that a changed graph (another seed, network, asset register or
+        policy) replaces the old one instead of merging with it; MERGE alone would leave stale
+        relationships, e.g. a decision record with two recommended actions. Other data in the
+        database is untouched. wipe=True deletes everything; keep_existing=True merges.
+        Returns the number of previous WaterOnt nodes removed."""
         from neo4j import GraphDatabase  # optional dependency
 
         def chunks(seq: list, n: int) -> Iterable[list]:
@@ -130,8 +136,16 @@ class KnowledgeGraph:
 
         driver = GraphDatabase.driver(uri, auth=(user, password))
         with driver.session(database=database) as s:
+            removed = 0
             if wipe:
                 s.run("MATCH (n) DETACH DELETE n")
+            elif not keep_existing:
+                while True:     # in batches, so large graphs do not exhaust transaction memory
+                    rec = s.run("MATCH (n:WNO) WITH n LIMIT 10000 DETACH DELETE n RETURN count(n) AS c").single()
+                    c = rec["c"] if rec is not None else 0
+                    removed += c
+                    if c == 0:
+                        break
             for c in self.NEO4J_CONSTRAINTS:
                 try:
                     s.run(c)
@@ -153,6 +167,7 @@ class KnowledgeGraph:
                     s.run(f"UNWIND $rows AS r MATCH (a:WNO {{id: r.u}}), (b:WNO {{id: r.v}}) "
                           f"MERGE (a)-[:{rel}]->(b)", rows=part)
         driver.close()
+        return removed
 
 
 def _neo4j_ok(v) -> bool:

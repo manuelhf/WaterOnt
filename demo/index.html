@@ -391,7 +391,8 @@ function decide(pipe, pol) {
   const band = pofBand(pipe.pofKm, pol.pofBands);
   const p = LEVEL[band], c = Math.max(LEVEL[pipe.hyd], LEVEL[pipe.svc]);
   const overall = overallCategory(p, c);
-  const priority = p * c + pipe.pofKm * Math.max(pipe.hScore, pipe.sScore);
+  // rounded to 4 decimals exactly as the Python Risk Layer stores it, so near-ties rank identically
+  const priority = Math.round((p * c + pipe.pofKm * Math.max(pipe.hScore, pipe.sScore)) * 1e4) / 1e4;
   const life = pol.designLife[pipe.mat];
   const overdue = (pol.referenceYear - pipe.insp) > pol.inspectionInterval[overall];
   const extra = pipe.fac.length ? ["G-SERV-01"] : [];
@@ -415,7 +416,8 @@ function planRules(q) {
   const s = q.toLowerCase();
   const p = { actions: [], excludeMonitor: false, bands: {}, material: [], installedBefore: null,
               minFailures: null, beyondDesignLife: false, criticalFacilities: false,
-              lowPressure: false, zones: [], unmonitored: false, pipes: [], topK: 25 };
+              lowPressure: false, zones: [], unmonitored: false, pipes: [], topK: 25,
+              minDia: null, maxDia: null, orderBy: null };
   if (/\b(replac\w*|renew\w*|renewal)\b/.test(s)) p.actions.push("Replacement");
   if (/\b(rehab\w*|relin\w*|refurbish\w*)\b/.test(s)) p.actions.push("Rehabilitation");
   if (/\b(inspect\w*|survey\w*|condition assessment)\b/.test(s)) p.actions.push("Inspection");
@@ -438,6 +440,12 @@ function planRules(q) {
   if ((m = s.match(/more than (\d+) failures/))) p.minFailures = +m[1] + 1;
   p.pipes = [...q.matchAll(/\bpipe\s+([A-Za-z0-9_\-]+)/g)].map(x => x[1]);
   if ((m = s.match(/\btop\s+(\d+)/))) p.topK = +m[1];
+  if ((m = s.match(/\b(?:above|over|greater than|larger than|bigger than|more than|wider than)\s*(\d+(?:\.\d+)?)\s*mm\b/))) p.minDia = +m[1];
+  if ((m = s.match(/\b(?:below|under|less than|smaller than|narrower than)\s*(\d+(?:\.\d+)?)\s*mm\b/))) p.maxDia = +m[1];
+  if (/\b(diameters?|bores?)\b/.test(s)) {
+    if (/\b(small\w*|narrow\w*|thin\w*|minimum)\b/.test(s)) p.orderBy = "diameter_asc";
+    else if (/\b(larg\w*|big\w*|wide\w*|maximum)\b/.test(s)) p.orderBy = "diameter_desc";
+  }
   return p;
 }
 function resolveZone(ref, zones) {
@@ -468,10 +476,14 @@ function retrieve(plan, pipes, decisions, data) {
     if (plan.lowPressure && !(p.minP < pol.minServicePressure + pol.pressureMargin)) return false;
     if (plan.unmonitored && p.mon !== false) return false;
     for (const z of plan.zones) { if (resolveZone(z, data.zones) !== p.zone) return false; }
+    if (plan.minDia !== null && plan.minDia !== undefined && !(p.dia > plan.minDia)) return false;
+    if (plan.maxDia !== null && plan.maxDia !== undefined && !(p.dia < plan.maxDia)) return false;
     return true;
   }).map(p => ({ pipe: p, d: decisions[pipes.indexOf(p)] }));
   out.sort((a, b) => ACTION_RANK[a.d.action] - ACTION_RANK[b.d.action] || b.d.priority - a.d.priority
                      || (a.pipe.id < b.pipe.id ? -1 : 1));
+  if (plan.orderBy === "diameter_asc") out.sort((a, b) => a.pipe.dia - b.pipe.dia);      // stable: urgency breaks ties
+  if (plan.orderBy === "diameter_desc") out.sort((a, b) => b.pipe.dia - a.pipe.dia);
   return out.slice(0, plan.topK);
 }
 // --- asset edits: mirrors asset.py/risk.py so edited pipes get the same PoF as a Python rebuild
@@ -1066,6 +1078,7 @@ function main(D) {
     "Which mains in the tank zone should be replaced? top 5",
     "Which pipes at low pressure need intervention?",
     "Which cast iron pipes are past their design life?",
+    "Which mains above 150 mm need intervention?",
   ].filter(q => !/PRV-3/.test(q) || D.zones.some(z => z.id.includes("PRV-3")));
   $("examples").innerHTML = EXAMPLES.map(q => `<button type="button">${esc(q)}</button>`).join("");
   $("examples").querySelectorAll("button").forEach(b => b.onclick = () => { $("q").value = b.textContent; ask(); });
@@ -1083,6 +1096,8 @@ function main(D) {
     if (pl.installedBefore) parts.push(`installed before ${pl.installedBefore}`);
     if (pl.minFailures !== null) parts.push(`at least ${pl.minFailures} failures`);
     if (pl.criticalFacilities) parts.push("serves a critical customer");
+    if (pl.minDia !== null) parts.push(`diameter above ${pl.minDia} mm`);
+    if (pl.maxDia !== null) parts.push(`diameter below ${pl.maxDia} mm`);
     if (pl.lowPressure) parts.push(`minimum pressure below ${D.config.minServicePressure + D.config.pressureMargin} m`);
     if (pl.unmonitored) parts.push("no pressure sensor within two segments");
     if (pl.zones.length) parts.push(`in the zone fed by ${pl.zones.join(", ")}`);
@@ -1092,13 +1107,23 @@ function main(D) {
   function ask() {
     const q = $("q").value.trim();
     if (!q) return;
-    const pl = planRules(q), res = retrieve(pl, D.pipes, decisions, D), parts = describePlan(pl);
+    const pl = planRules(q), parts = describePlan(pl);
+    if (!parts.length && !pl.orderBy) {           // nothing understood: say so, list nothing
+      highlight = new Set(); paint();
+      $("answer").innerHTML = `<div class="understood">This question was not understood, so no pipes are listed. The explorer understands actions (replace, rehabilitate, inspect), risks (intolerable, likely to fail, hydraulically critical), zones (PRV-3, tank zone), gaps (unmonitored, low pressure), materials, installation dates, failures and diameters (above 150 mm, smallest diameters). For other questions, ask Claude.</div>
+        <div class="btnrow" style="margin-top:10px"><button class="btn quiet" type="button" id="claudeResBtn">Ask Claude about this question</button></div>`;
+      $("claudeResBtn").onclick = () => openClaude("Claude will receive your question and the network summary.", resultsEvidence(q, parts, [], 0), q);
+      $("examples").hidden = true; $("moreEx").hidden = false;
+      return;
+    }
+    const res = retrieve(pl, D.pipes, decisions, D);
+    const order = pl.orderBy === "diameter_asc" ? "ranked by diameter, smallest first, then urgency of action"
+                : pl.orderBy === "diameter_desc" ? "ranked by diameter, largest first, then urgency of action"
+                : "ranked by urgency of action, then risk";
     const total = retrieve({ ...pl, topK: 1e9 }, D.pipes, decisions, D).length;
     highlight = new Set(res.map(r => r.pipe.id));
     paint();
-    const understood = parts.length
-      ? `<div class="understood">Understood as: <b>${parts.map(esc).join("; ")}</b>. ${total > res.length ? `Showing the top ${res.length} of ${total}, ` : `${total} match, `}ranked by urgency of action, then risk.</div>`
-      : `<div class="understood">No filter recognised, so all pipes are ranked. Try naming an action (replace, rehabilitate, inspect), a risk (intolerable, likely to fail), a zone (PRV-3, tank zone) or a gap (unmonitored, low pressure).</div>`;
+    const understood = `<div class="understood">Understood as: <b>${parts.length ? parts.map(esc).join("; ") : "all pipes"}</b>. ${total > res.length ? `Showing the top ${res.length} of ${total}, ` : `${total} match, `}${order}.</div>`;
     const list = res.length ? `<ol class="results">${res.map(({ pipe: p, d }) =>
       `<li><button type="button" class="rhead" data-i="${pipeIndex[p.id]}" aria-label="Open the audit trail for ${esc(p.id)}">
          <span class="rtitle">${esc(p.id)} <span class="act ${d.action}">${d.action}</span></span>

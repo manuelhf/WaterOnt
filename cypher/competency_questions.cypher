@@ -1,5 +1,7 @@
 // WaterOnt competency questions in Cypher, for the graph pushed by
 //   python -m wateront build --inp L-TOWN.inp --neo4j bolt://localhost:7687
+// Each push replaces the previous WaterOnt graph. To clean a database filled by
+// earlier versions (which merged pushes), run once:  MATCH (n:WNO) DETACH DELETE n
 // Node ids are type-prefixed: J:<junction>, P:<pipe>, PU:<pump>, V:<valve>.
 
 // CQ1  What nodes does pipe $P connect?
