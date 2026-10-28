@@ -63,7 +63,12 @@ def build_knowledge_graph(inp: str, cfg: Config | None = None, asset_csv: str | 
 
     assets = synthesise_asset_table(wn, cfg)
     if asset_csv:  # real register overrides priors wherever it has a value
-        overrides = load_asset_overrides(asset_csv, cfg)
+        rep: dict = {}
+        overrides = load_asset_overrides(asset_csv, cfg, report=rep)
+        log(f"[asset]    read {rep['rows']} rows ({rep['separator']}-separated) for {rep['pipes']} pipes"
+            + (f"; combined {rep['combined']} extra rows for pipes listed more than once (latest inspection wins)"
+               if rep["combined"] else "")
+            + (f"; ignored columns {rep['columns_ignored']}" if rep["columns_ignored"] else ""))
         unknown = set(overrides) - set(assets["pipe"])
         if unknown:
             log(f"[asset]    ignoring {len(unknown)} register rows with no matching pipe, "

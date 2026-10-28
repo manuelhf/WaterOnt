@@ -445,3 +445,96 @@ def test_neo4j_keep_existing_and_wipe_options(built, monkeypatch):
     wipe = _FakeNeo4j()
     _push(built, monkeypatch, wipe, wipe=True)
     assert wipe.statements[0] == "MATCH (n) DETACH DELETE n"
+
+
+FIX = os.path.join(ROOT, "tests", "fixtures")
+
+
+def test_register_reads_excel_style_files():
+    """Semicolons, byte-order mark, CRLF, other header names, dates, material names,
+    decimal commas and an extra column: all read."""
+    from wateront.asset import load_asset_overrides
+    rep = {}
+    o = load_asset_overrides(os.path.join(FIX, "register_excel_semicolon.csv"), report=rep)
+    assert o["101"]["install_year"] == 1938 and o["101"]["material"] == "CI" and o["101"]["condition_grade"] == 4
+    assert o["101"]["last_inspection_year"] == 2015 and o["101"]["soil_corrosivity"] == "High"
+    assert o["101"]["failure_years"] == [2009, 2017] and o["105"]["failure_years"] == []
+    assert o["105"]["material"] == "PVC" and o["105"]["last_inspection_year"] == 2019
+    assert rep["separator"] == "semicolon" and rep["columns_ignored"] == ["notes"]
+    t = load_asset_overrides(os.path.join(FIX, "register_tabs.csv"))
+    assert t == {"111": {"install_year": 1970, "material": "DI", "material_source": "register"}}
+
+
+def test_inspection_log_latest_inspection_wins():
+    from wateront.asset import load_asset_overrides
+    rep = {}
+    o = load_asset_overrides(os.path.join(FIX, "inspection_log.csv"), report=rep)
+    assert o["101"] == {"last_inspection_year": 2021, "condition_grade": 4}
+    assert rep["combined"] == 2 and "999" in o            # unknown pipes are reported by the pipeline
+
+
+def test_bad_register_lists_every_problem_and_applies_nothing():
+    from wateront.asset import load_asset_overrides
+    with pytest.raises(ValueError) as e:
+        load_asset_overrides(os.path.join(FIX, "register_bad.csv"))
+    msg = str(e.value)
+    assert "install_year" in msg and "material" in msg and "condition_grade" in msg
+
+
+def test_inspection_log_changes_decisions_end_to_end(built):
+    """A newer inspection resets the inspection clock (rule R4) in a full rebuild."""
+    from wateront.pipeline import build_knowledge_graph
+    res = build_knowledge_graph("Net3", asset_csv=os.path.join(FIX, "inspection_log.csv"), verbose=False)
+    a = res.assets.set_index("pipe")
+    assert a.loc["101", "last_inspection_year"] == 2021 and a.loc["101", "condition_grade"] == 4
+
+
+def _net3_inp():
+    import glob
+    import wntr
+    return glob.glob(os.path.join(os.path.dirname(wntr.__file__), "library", "**", "Net3.inp"), recursive=True)[0]
+
+
+def test_converter_recognises_files_by_their_columns(tmp_path):
+    from wateront.convert import classify
+    assert classify(_net3_inp()) == "inp"
+    assert classify(os.path.join(FIX, "inspection_log.csv")) == "assets"
+    assert classify(os.path.join(FIX, "register_excel_semicolon.csv")) == "assets"
+    assert classify(os.path.join(FIX, "sensors_semicolon.csv")) == "sensors"
+    assert classify(os.path.join(ROOT, "data", "facilities_template.csv")) == "facilities"
+    f = tmp_path / "fails.csv"; f.write_text("Pipe;Failure date;Mode\n101;2019-03-02;Burst\n")
+    assert classify(str(f)) in ("failures", "assets")
+
+
+def test_converter_builds_a_network_file_for_the_explorer(tmp_path):
+    from wateront.convert import convert
+    out, summary = convert([_net3_inp(), os.path.join(FIX, "inspection_log.csv"),
+                            os.path.join(FIX, "sensors_semicolon.csv")], out_dir=str(tmp_path))
+    d = json.load(open(out))
+    assert d["format"] == "wateront-web/1" and len(d["pipes"]) == 117
+    text = "\n".join(summary)
+    assert "Asset register / inspection log: inspection_log.csv" in text and "Sensor layout" in text
+    assert "no node coordinates" not in text
+
+
+def test_converter_warns_about_missing_data_and_bad_uploads(tmp_path):
+    from wateront.convert import convert
+    raw = open(_net3_inp()).read()
+    i = raw.upper().find("[COORDINATES]"); j = raw.upper().find("[", i + 5)
+    p = tmp_path / "nocoords.inp"; p.write_text(raw[:i] + raw[j:])
+    _, summary = convert([str(p)], out_dir=str(tmp_path))
+    text = "\n".join(summary)
+    assert "SYNTHETIC" in text and "no node coordinates" in text
+    with pytest.raises(ValueError, match="exactly one EPANET model"):
+        convert([os.path.join(FIX, "inspection_log.csv")], out_dir=str(tmp_path))
+    with pytest.raises(ValueError, match="more than one assets file"):
+        convert([_net3_inp(), os.path.join(FIX, "inspection_log.csv"), os.path.join(FIX, "register_tabs.csv")],
+                out_dir=str(tmp_path))
+
+
+def test_converter_says_which_attributes_are_still_synthetic(tmp_path):
+    from wateront.convert import convert
+    _, summary = convert([_net3_inp(), os.path.join(FIX, "inspection_log.csv")], out_dir=str(tmp_path))
+    text = "\n".join(summary)
+    assert "covers 2 of 117 pipes" in text and "1 rows name pipes not in the model" in text
+    assert "installation years, materials" in text and "still SYNTHETIC" in text

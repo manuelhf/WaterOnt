@@ -95,59 +95,113 @@ REGISTER_INT = ("install_year", "condition_grade", "last_inspection_year")
 REGISTER_TEXT = ("material", "lining", "joint", "soil_corrosivity")
 
 
-def load_asset_overrides(path: str, cfg: Config | None = None) -> dict[str, dict]:
-    """Read an asset register as per-pipe overrides.
+def load_asset_overrides(path: str, cfg: Config | None = None, report: dict | None = None) -> dict[str, dict]:
+    """Read an asset register or an inspection log as per-pipe overrides.
 
-    Any subset of the columns in `data/asset_register_template.csv` may be present, and
-    any cell may be blank: blank means "not known, keep the current value". For
-    `failure_years` write years separated by ';', or `none` for a pipe with no recorded
-    failures. Raises ValueError listing every invalid cell, so a register is never
-    half-applied."""
+    Any subset of the columns in `data/asset_register_template.csv` may be present, under
+    their template names or common alternatives (see wateront.tables), and any cell may be
+    blank: blank means "not known, keep the current value". Years may be dates. For
+    `failure_years` write years separated by ';', or `none` for no recorded failures.
+
+    A pipe may appear on several rows, as in an inspection log with one row per survey: rows
+    are combined in order of inspection date, so the most recent inspection (and its
+    condition grade) wins; failure years from all rows are combined.
+
+    Raises ValueError listing every invalid cell, so a register is never half-applied.
+    If `report` is a dict, it is filled with what was read (rows, pipes, combined rows,
+    separator, columns used and ignored)."""
+    from .tables import material_of, number_of, read_table, soil_of, split_list, year_of
     cfg = cfg or Config()
-    df = pd.read_csv(path, dtype=str, keep_default_na=False).rename(columns=str.strip)
-    if "pipe" not in df.columns:
-        raise ValueError(f"{path}: needs a 'pipe' column")
-    out, errors = {}, []
-    for n, row in enumerate(df.to_dict("records"), start=2):
-        pipe = row["pipe"].strip()
+    head, rows, delim = read_table(path)
+    if "pipe" not in head:
+        raise ValueError(f"{path}: needs a pipe column (for example 'pipe' or 'Pipe ID'); found {head}")
+    known = {"pipe", *REGISTER_INT, *REGISTER_TEXT, "failure_years", "failure_modes"}
+    col = {h: k for k, h in enumerate(head) if h in known and h not in {}}
+    get = lambda r, c: (r[col[c]].strip() if c in col and col[c] < len(r) else "")
+    ref, errors, groups = cfg.reference_year, [], {}
+    for n, r in enumerate(rows, start=2):
+        pipe = get(r, "pipe")
         if not pipe:
             continue
         rec: dict = {}
-        for col in REGISTER_INT:
-            v = row.get(col, "").strip()
+        for c, lo, hi in (("install_year", 1800, ref), ("last_inspection_year", 1800, ref)):
+            v = get(r, c)
             if v:
-                try:
-                    rec[col] = int(float(v))
-                except ValueError:
-                    errors.append(f"line {n}, {col}: '{v}' is not a number")
-        for col in REGISTER_TEXT:
-            v = row.get(col, "").strip()
-            if v:
-                rec[col] = v
-        if "material" in rec and rec["material"] not in cfg.weibull:
-            errors.append(f"line {n}, material: '{rec['material']}' is not one of {sorted(cfg.weibull)}")
-        if "soil_corrosivity" in rec and rec["soil_corrosivity"] not in cfg.soil_corrosivity_factor:
-            errors.append(f"line {n}, soil_corrosivity: use one of {sorted(cfg.soil_corrosivity_factor)}")
-        if "condition_grade" in rec and not 1 <= rec["condition_grade"] <= 5:
-            errors.append(f"line {n}, condition_grade: must be 1 to 5")
-        fy = row.get("failure_years", "").strip()
+                y = year_of(v)
+                if y is None:
+                    errors.append(f"line {n}, {c}: '{v}' is not a year or a date")
+                elif not lo <= y <= hi:
+                    errors.append(f"line {n}, {c}: {y} is outside {lo}-{hi}")
+                else:
+                    rec[c] = y
+        v = get(r, "condition_grade")
+        if v:
+            x = number_of(v)
+            if x is None:
+                errors.append(f"line {n}, condition_grade: '{v}' is not a number")
+            elif not 1 <= x <= 5:
+                errors.append(f"line {n}, condition_grade: must be 1 to 5")
+            else:
+                rec["condition_grade"] = int(x)
+        v = get(r, "material")
+        if v:
+            m = material_of(v)
+            if m is None or m not in cfg.weibull:
+                errors.append(f"line {n}, material: '{v}' is not recognised (use {', '.join(sorted(cfg.weibull))} "
+                              f"or a name such as 'cast iron')")
+            else:
+                rec["material"], rec["material_source"] = m, "register"
+        v = get(r, "soil_corrosivity")
+        if v:
+            so = soil_of(v)
+            if so is None or so not in cfg.soil_corrosivity_factor:
+                errors.append(f"line {n}, soil_corrosivity: use one of {sorted(cfg.soil_corrosivity_factor)}")
+            else:
+                rec["soil_corrosivity"] = so
+        for c in ("lining", "joint"):
+            if v := get(r, c):
+                rec[c] = v
+        fy = get(r, "failure_years")
         if fy:
-            if fy.lower() in ("none", "0"):
+            if fy.lower() in ("none", "0", "-", "no", "nil"):
                 rec["failure_years"], rec["failure_modes"] = [], []
             else:
-                try:
-                    years = [int(float(x)) for x in fy.split(";") if x.strip()]
-                except ValueError:
-                    errors.append(f"line {n}, failure_years: use years separated by ';', or 'none'")
-                    years = []
-                modes = [m.strip() for m in row.get("failure_modes", "").split(";") if m.strip()]
-                rec["failure_years"] = years
-                rec["failure_modes"] = (modes + ["Burst"] * len(years))[: len(years)]
-        if "material" in rec:
-            rec["material_source"] = "register"
-        out[pipe] = rec
+                years = [year_of(x) for x in split_list(fy)]
+                if any(y is None or not 1800 <= y <= ref for y in years):
+                    errors.append(f"line {n}, failure_years: use years or dates separated by ';', or 'none'")
+                else:
+                    modes = split_list(get(r, "failure_modes"))
+                    rec["failure_years"] = years
+                    rec["failure_modes"] = (modes + ["Burst"] * len(years))[: len(years)]
+        groups.setdefault(pipe, []).append(rec)
     if errors:
         raise ValueError(f"{path}: " + "; ".join(errors[:20]) + (" ..." if len(errors) > 20 else ""))
+    out, combined = {}, 0
+    for pipe, recs in groups.items():
+        combined += len(recs) - 1
+        # oldest inspection first, rows without an inspection date before dated ones (stable)
+        recs = sorted(recs, key=lambda x: x.get("last_inspection_year", -1))
+        merged, fyears, fmodes, failures_given = {}, [], [], False
+        for rec in recs:
+            for k, v in rec.items():
+                if k in ("failure_years", "failure_modes"):
+                    continue
+                merged[k] = v
+            if "failure_years" in rec:
+                failures_given = True
+                for y, m in zip(rec["failure_years"], rec["failure_modes"]):
+                    if y not in fyears:
+                        fyears.append(y); fmodes.append(m)
+        if failures_given:
+            order = sorted(range(len(fyears)), key=lambda k: fyears[k])
+            merged["failure_years"] = [fyears[k] for k in order]
+            merged["failure_modes"] = [fmodes[k] for k in order]
+        out[pipe] = merged
+    if report is not None:
+        report.update(rows=sum(len(v) for v in groups.values()), pipes=len(out), combined=combined,
+                      separator={",": "comma", ";": "semicolon", "\t": "tab"}[delim],
+                      columns_used=[h for h in head if h in known],
+                      columns_ignored=[h for h in head if h not in known])
     return out
 
 
@@ -177,26 +231,43 @@ def load_asset_table(path: str) -> pd.DataFrame:
 
 def load_facilities(path: str) -> dict[str, str]:
     """Critical customers: CSV with columns `junction,type` (e.g. Hospital, School,
-    CareHome, IndustrialCustomer). Hospitals raise service criticality to Critical,
-    any other listed customer to at least High."""
-    df = pd.read_csv(path, dtype=str, keep_default_na=False)
-    if not {"junction", "type"} <= set(df.columns):
-        raise ValueError(f"{path}: needs columns 'junction' and 'type'")
-    return {r["junction"].strip(): r["type"].strip() for r in df.to_dict("records") if r["junction"].strip()}
+    CareHome, IndustrialCustomer), or alternatives such as `node`. Hospitals raise service
+    criticality to Critical, any other listed customer to at least High."""
+    from .tables import read_table
+    head, rows, _ = read_table(path)
+    if "element" not in head or "type" not in head:
+        raise ValueError(f"{path}: needs a junction column (for example 'junction' or 'node') and a 'type' column")
+    ce, ct = head.index("element"), head.index("type")
+    return {r[ce].strip(): r[ct].strip() for r in rows if len(r) > max(ce, ct) and r[ce].strip()}
 
 
 def load_failure_events(path: str) -> dict[str, list[tuple[int, str]]]:
-    """Observed failures, e.g. converted from the BattLeDIM leakage reports.
-    CSV columns: pipe, and either `year` or `date`/`start` (ISO), optional `mode`
-    (defaults to Burst; leaks without a recorded mode are treated as bursts)."""
-    df = pd.read_csv(path, dtype={"pipe": str})
-    col = next((c for c in ("year", "date", "start", "start_time") if c in df.columns), None)
+    """Observed failures, e.g. converted from the BattLeDIM leakage reports. One row per
+    failure: a pipe column, and a `year` or a date column (`date`, `start`, 'Failure date'...),
+    optionally `mode` (defaults to Burst). Raises ValueError listing every bad row."""
+    from .tables import read_table, year_of
+    head, rows, _ = read_table(path)
+    if "pipe" not in head:
+        raise ValueError(f"{path}: needs a pipe column (for example 'pipe' or 'Pipe ID')")
+    col = next((c for c in ("year", "date", "start", "start_time", "failure_years") if c in head), None)
     if col is None:
-        raise ValueError(f"{path}: need a 'year' or 'date'/'start' column")
-    years = df[col] if col == "year" else pd.to_datetime(df[col]).dt.year
+        raise ValueError(f"{path}: needs a 'year' or a date column")
+    cp, cy = head.index("pipe"), head.index(col)
+    cm = next((head.index(c) for c in ("mode", "failure_modes") if c in head), None)
     out: dict[str, list[tuple[int, str]]] = {}
-    for pipe, yr, mode in zip(df["pipe"], years, df.get("mode", pd.Series(["Burst"] * len(df)))):
-        out.setdefault(str(pipe).strip(), []).append((int(yr), str(mode) if isinstance(mode, str) else "Burst"))
+    errors = []
+    for n, r in enumerate(rows, start=2):
+        pipe = r[cp].strip() if cp < len(r) else ""
+        if not pipe:
+            continue
+        y = year_of(r[cy]) if cy < len(r) else None
+        if y is None:
+            errors.append(f"line {n}: '{r[cy] if cy < len(r) else ''}' is not a year or a date")
+            continue
+        mode = (r[cm].strip() if cm is not None and cm < len(r) else "") or "Burst"
+        out.setdefault(pipe, []).append((y, mode))
+    if errors:
+        raise ValueError(f"{path}: " + "; ".join(errors[:20]))
     return out
 
 

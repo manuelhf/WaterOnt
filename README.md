@@ -10,6 +10,18 @@ Reference implementation for *Explainable Asset Management in Water Networks usi
 
 It builds the four-layer WaterOnt knowledge graph from any EPANET `.inp` file, answers engineering questions through a GraphRAG engine whose every recommendation carries a verifiable path back to asset evidence and the authorising policy clause, and compares it against an ML failure-prediction baseline and a flat-document RAG baseline.
 
+## Use your own network (no Python needed)
+
+WaterOnt is research software under active development: it runs on any EPANET model, but its
+recommendations follow an illustrative policy and, unless you supply your own records,
+synthetic asset histories. Use it to explore and to give feedback, not for operational decisions.
+
+1. **Convert your model.** Open the [one-click converter](https://colab.research.google.com/github/manuelhf/WaterOnt/blob/main/demo/WaterOnt_convert.ipynb) in Google Colab, run step 1, then step 2, and select your `.inp` together with any of: an asset register or inspection log, a failure list, a sensor layout, critical customers. The `.json` downloads automatically, with a summary of what came from your files and what is still synthetic.
+2. **Open it** in the [explorer](https://manuelhf.github.io/WaterOnt/) with **Open network file (.json)…**. The file is read in your browser and not uploaded anywhere.
+3. **Add or update data later** in the explorer's Data tab: *Import asset register* also accepts inspection logs, and sensor layouts can be imported or edited on the map.
+
+Files do not have to follow the templates in [`data/`](data/) exactly: column names such as "Pipe ID", "Last inspection" or "Installation year" are recognised; dates can stand in for years; materials can be written as names ("cast iron", "uPVC", "MDPE"); Excel CSV files with commas, semicolons or tabs all work. An inspection log may list a pipe several times: the most recent inspection wins. A file with any invalid value is rejected as a whole, with every problem listed, so a register is never half-applied.
+
 ## Paper → code map
 
 | Paper | Module | What it does |

@@ -192,3 +192,57 @@ def test_monitoring_parity_and_sensor_round_trip(tmp_path):
 def test_net3_without_sensors_is_all_monitored(built, tmp_path):
     js = run_js_sensors(export_payload(built), add=[], remove=[], tmp_path=tmp_path)
     assert js["monOk"] and all(js["mon"])
+
+
+def test_register_reading_matches_python(built, tmp_path):
+    """The explorer reads asset registers and inspection logs exactly as asset.py does."""
+    from wateront.asset import load_asset_overrides
+    from wateront.config import Config
+    fixtures = ["register_excel_semicolon.csv", "inspection_log.csv", "register_tabs.csv", "register_bad.csv"]
+    tpl = open(os.path.join(ROOT, "wateront", "web_template.html"), encoding="utf-8").read()
+    logic = re.search(r"// LOGIC START[^\n]*\n(.*?)// LOGIC END", tpl, re.S).group(1)
+    cfg = Config()
+    jscfg = {"referenceYear": cfg.reference_year, "weibull": cfg.weibull, "soilFactor": cfg.soil_corrosivity_factor}
+    pipes = [built.kg.node(p)["name"] for p in built.kg.nodes("Pipe")]
+    (tmp_path / "r.js").write_text(logic + """
+const fs = require('fs'), [cfg, pipes, files] = JSON.parse(fs.readFileSync(process.argv[2], 'utf8'));
+console.log(JSON.stringify(files.map(f => parseRegister(fs.readFileSync(f, 'utf8'), pipes, cfg))));
+""")
+    paths = [os.path.join(ROOT, "tests", "fixtures", f) for f in fixtures]
+    (tmp_path / "in.json").write_text(json.dumps([jscfg, pipes, paths]))
+    js = json.loads(subprocess.run(["node", str(tmp_path / "r.js"), str(tmp_path / "in.json")],
+                                   capture_output=True, text=True, check=True).stdout)
+    key = {"install_year": "installYear", "condition_grade": "grade", "last_inspection_year": "insp",
+           "material": "mat", "soil_corrosivity": "soil", "failure_years": "failYears"}
+    for f, path, j in zip(fixtures, paths, js):
+        try:
+            py = load_asset_overrides(path, cfg)
+        except ValueError as e:
+            assert j["errors"], f
+            assert len(j["errors"]) == str(e).count("line "), f      # same problems found
+            continue
+        assert not j["errors"], (f, j["errors"])
+        known = set(pipes)
+        assert sorted(j["unknown"]) == sorted(p for p in py if p not in known), f
+        for pipe, rec in py.items():
+            if pipe not in known:
+                continue
+            assert {key[k]: v for k, v in rec.items() if k in key} == j["edits"][pipe], (f, pipe)
+
+
+def test_sensor_file_reading_matches_python(built, tmp_path):
+    import wntr
+    from wateront.physical import load_sensors
+    path = os.path.join(ROOT, "tests", "fixtures", "sensors_semicolon.csv")
+    py = load_sensors(path, built.wn)
+    tpl = open(os.path.join(ROOT, "wateront", "web_template.html"), encoding="utf-8").read()
+    logic = re.search(r"// LOGIC START[^\n]*\n(.*?)// LOGIC END", tpl, re.S).group(1)
+    (tmp_path / "data.json").write_text(json.dumps(export_payload(built)))
+    (tmp_path / "s.js").write_text(logic + """
+const fs = require('fs'), D = JSON.parse(fs.readFileSync(process.argv[2], 'utf8'));
+console.log(JSON.stringify(parseSensors(fs.readFileSync(process.argv[3], 'utf8'), D)));
+""")
+    js = json.loads(subprocess.run(["node", str(tmp_path / "s.js"), str(tmp_path / "data.json"), path],
+                                   capture_output=True, text=True, check=True).stdout)
+    assert not js["errors"], js["errors"]
+    assert {k: sorted(v) for k, v in js["layout"].items()} == {k: sorted(c for c, _ in v) for k, v in py.items()}

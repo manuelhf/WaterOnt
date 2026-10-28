@@ -236,7 +236,7 @@ footer.note { font-size: 12.5px; color: var(--ink-2); padding: 12px 20px; border
       </select>
     </label>
     <label><input type="checkbox" id="showSensors" checked> Show sensors</label>
-    <button class="btn quiet" id="openBtn" type="button" title="Open a network exported from Python or Colab. The file stays on your computer.">Open network…</button>
+    <button class="btn quiet" id="openBtn" type="button" title="Open a WaterOnt network file (.json). To use your own EPANET model (.inp), convert it first with the one-click Colab converter. The file stays on your computer.">Open network file (.json)…</button>
     <details class="menu" id="saveMenu">
       <summary class="btn quiet">Save…</summary>
       <div class="menu-list" role="menu">
@@ -351,7 +351,7 @@ footer.note { font-size: 12.5px; color: var(--ink-2); padding: 12px 20px; border
         <dt>Critical customers</dt><dd><code>--facilities facilities.csv</code></dd>
         <dt>Your policy text</dt><dd><code>--guidelines policy.json</code></dd>
       </dl>
-      <p>Then <code>python -m wateront web --json --out mynet.json …</code> and open the file here with <b>Open network…</b>. An asset register saved from this page can go straight back into <code>--assets</code>.</p>
+      <p>Then <code>python -m wateront web --json --out mynet.json …</code> and open the file here with <b>Open network file (.json)…</b>. Without Python, use the <a href="https://colab.research.google.com/github/manuelhf/WaterOnt/blob/main/demo/WaterOnt_convert.ipynb" target="_blank" rel="noopener">one-click converter in Google Colab</a>: upload your .inp and any CSV files, press Run, and download the .json. An asset register saved from this page can go straight back into <code>--assets</code>.</p>
     </section>
     <footer class="note" id="footnote"></footer>
   </aside>
@@ -523,57 +523,98 @@ function toRegisterCsv(pipes, cfg) {
   return toCsv([REGISTER_COLS, ...pipes.map(p => [p.id, cfg.referenceYear - p.age, p.mat, p.soil, p.grade, p.insp,
     p.failYears.length ? p.failYears.join(";") : "none", p.failModes.join(";")])]);
 }
-function parseCsv(text) {
+// --- tolerant table reading: mirrors wateront/tables.py (the parity tests check they agree)
+const TABLE_ALIASES = {"pipe": ["pipe_id", "pipeid", "id", "asset_id", "assetid", "link", "link_id", "pipe_name", "name", "main", "main_id"], "install_year": ["installation_year", "year_installed", "installed", "install_date", "installation_date", "year_laid", "laid", "install", "date_installed", "year_of_installation"], "material": ["pipe_material", "mat", "material_type"], "condition_grade": ["condition", "grade", "condition_score", "condition_rating", "cond_grade"], "last_inspection_year": ["last_inspection", "last_inspected", "inspection_year", "inspection_date", "date_inspected", "inspected", "inspection", "date_of_inspection", "survey_date", "survey_year", "last_survey"], "soil_corrosivity": ["soil", "corrosivity", "soil_corrosion", "soil_aggressivity"], "failure_years": ["failure_year", "failure_dates", "failure_date", "burst_years", "burst_dates"], "failure_modes": ["failure_mode", "burst_modes", "burst_mode"], "lining": ["liner", "lining_type"], "joint": ["joint_type", "joints"], "element": ["node", "junction", "location", "sensor_location", "asset"], "type": ["sensor_type", "kind", "customer_type", "facility_type", "category"]};
+const ALIAS_OF = Object.fromEntries(Object.entries(TABLE_ALIASES).flatMap(([c, names]) => names.map(a => [a, c])));
+const MATERIAL_NAMES = {"ci": "CI", "castiron": "CI", "greyiron": "CI", "grayiron": "CI", "spuniron": "CI", "iron": "CI", "di": "DI", "ductileiron": "DI", "ductile": "DI", "sgiron": "DI", "ac": "AC", "asbestoscement": "AC", "asbestos": "AC", "fibrecement": "AC", "fibercement": "AC", "pvc": "PVC", "upvc": "PVC", "pvcu": "PVC", "mpvc": "PVC", "pvco": "PVC", "polyvinylchloride": "PVC", "hdpe": "HDPE", "pe": "HDPE", "mdpe": "HDPE", "polyethylene": "HDPE", "polyethene": "HDPE", "pe80": "HDPE", "pe100": "HDPE", "alkathene": "HDPE", "steel": "Steel", "st": "Steel", "galvanisedsteel": "Steel", "galvanizedsteel": "Steel"};
+const SOIL_NAMES = {"low": "Low", "medium": "Medium", "med": "Medium", "moderate": "Medium", "high": "High"};
+const normHeader = h => { const s = h.replace(/\ufeff/g, "").trim().toLowerCase().replace(/[^a-z0-9]+/g, "_").replace(/^_+|_+$/g, ""); return ALIAS_OF[s] || s; };
+function detectDelimiter(line) {
+  const n = { ",": 0, ";": 0, "\t": 0 }; let q = false;
+  for (const c of line) { if (c === '"') q = !q; else if (!q && c in n) n[c]++; }
+  const best = [",", ";", "\t"].reduce((a, b) => (n[b] > n[a] ? b : a));
+  return n[best] ? best : ",";
+}
+function parseTable(text) {
+  text = text.replace(/^\ufeff/, "");
+  const first = text.split(/\r?\n/).find(l => l.trim()) || "", delim = detectDelimiter(first);
   const rows = []; let row = [], cell = "", q = false;
   for (let i = 0; i < text.length; i++) {
     const c = text[i];
     if (q) { if (c === '"' && text[i + 1] === '"') { cell += '"'; i++; } else if (c === '"') q = false; else cell += c; }
     else if (c === '"') q = true;
-    else if (c === ",") { row.push(cell); cell = ""; }
+    else if (c === delim) { row.push(cell); cell = ""; }
     else if (c === "\n" || c === "\r") { if (c === "\r" && text[i + 1] === "\n") i++; row.push(cell); rows.push(row); row = []; cell = ""; }
     else cell += c;
   }
   if (cell !== "" || row.length) { row.push(cell); rows.push(row); }
-  return rows.filter(r => r.some(x => x.trim() !== ""));
+  const kept = rows.filter(r => r.some(x => x.trim() !== ""));
+  return { head: kept.length ? kept[0].map(normHeader) : [], rows: kept.slice(1), delim };
 }
+function yearOf(v) {
+  v = v.trim();
+  if (/^\d{4}(\.0*)?$/.test(v)) return Math.trunc(Number(v));
+  const ys = v.match(/(?<!\d)(1[89]\d\d|20\d\d)(?!\d)/g) || [];
+  return ys.length === 1 ? Number(ys[0]) : null;
+}
+function numberOf(v) { v = v.trim(); if (v.includes(",") && !v.includes(".")) v = v.replace(",", "."); const x = v === "" ? NaN : Number(v); return Number.isFinite(x) ? x : null; }
+const materialOf = v => MATERIAL_NAMES[v.toLowerCase().replace(/[^a-z0-9]/g, "")] || null;
+const soilOf = v => SOIL_NAMES[v.trim().toLowerCase()] || null;
+const splitList = v => v.split(/[;,|]/).map(x => x.trim()).filter(Boolean);
 function parseRegister(text, pipeIds, cfg) {
-  // Same rules as asset.load_asset_overrides: blank keeps, 'none' clears failures, all-or-nothing.
-  const rows = parseCsv(text);
-  if (!rows.length) return { errors: ["the file is empty"], edits: {}, unknown: [] };
-  const head = rows[0].map(h => h.trim());
-  if (!head.includes("pipe")) return { errors: ["the first row must contain a 'pipe' column"], edits: {}, unknown: [] };
-  const col = n => head.indexOf(n), errors = [], edits = {}, unknown = [];
-  const known = new Set(pipeIds), mats = Object.keys(cfg.weibull), soils = Object.keys(cfg.soilFactor);
-  rows.slice(1).forEach((r, k) => {
-    const line = k + 2, get = n => (col(n) >= 0 ? (r[col(n)] || "").trim() : "");
-    const id = get("pipe");
-    if (!id) return;
-    if (!known.has(id)) { unknown.push(id); return; }
-    const e = {}, num = (n, key, lo, hi) => {
-      const v = get(n);
-      if (!v) return;
-      const x = Number(v);
-      if (!Number.isFinite(x)) errors.push(`line ${line}, ${n}: “${v}” is not a number`);
-      else if (x < lo || x > hi) errors.push(`line ${line}, ${n}: ${v} is outside ${lo}–${hi}`);
-      else e[key] = Math.trunc(x);
-    };
-    num("install_year", "installYear", 1800, cfg.referenceYear);
-    num("condition_grade", "grade", 1, 5);
-    num("last_inspection_year", "insp", 1800, cfg.referenceYear);
-    const m = get("material"); if (m) { if (mats.includes(m)) e.mat = m; else errors.push(`line ${line}, material: “${m}” is not one of ${mats.join(", ")}`); }
-    const so = get("soil_corrosivity"); if (so) { if (soils.includes(so)) e.soil = so; else errors.push(`line ${line}, soil_corrosivity: use ${soils.join(", ")}`); }
+  // Same rules as asset.load_asset_overrides: blank keeps, 'none' clears failures, all-or-nothing;
+  // several rows for one pipe (an inspection log) are combined, latest inspection winning.
+  const { head, rows, delim } = parseTable(text);
+  if (!head.length) return { errors: ["the file is empty"], edits: {}, unknown: [], info: {} };
+  if (!head.includes("pipe")) return { errors: ["the first row needs a pipe column (for example “pipe” or “Pipe ID”)"], edits: {}, unknown: [], info: {} };
+  const KNOWN = ["pipe", "install_year", "condition_grade", "last_inspection_year", "material", "lining", "joint", "soil_corrosivity", "failure_years", "failure_modes"];
+  const col = Object.fromEntries(head.map((h, k) => [h, k]).filter(([h]) => KNOWN.includes(h)).reverse());
+  const ref = cfg.referenceYear, errors = [], groups = new Map(), unknown = [], known = new Set(pipeIds), mats = Object.keys(cfg.weibull), soils = Object.keys(cfg.soilFactor);
+  rows.forEach((r, k) => {
+    const n = k + 2, get = c => (c in col ? (r[col[c]] || "").trim() : "");
+    const pipe = get("pipe");
+    if (!pipe) return;
+    const rec = {};
+    for (const [c, key] of [["install_year", "installYear"], ["last_inspection_year", "insp"]]) {
+      const v = get(c); if (!v) continue;
+      const y = yearOf(v);
+      if (y === null) errors.push(`line ${n}, ${c}: “${v}” is not a year or a date`);
+      else if (y < 1800 || y > ref) errors.push(`line ${n}, ${c}: ${y} is outside 1800–${ref}`);
+      else rec[key] = y;
+    }
+    let v = get("condition_grade");
+    if (v) { const x = numberOf(v); if (x === null) errors.push(`line ${n}, condition_grade: “${v}” is not a number`); else if (x < 1 || x > 5) errors.push(`line ${n}, condition_grade: must be 1 to 5`); else rec.grade = Math.trunc(x); }
+    v = get("material");
+    if (v) { const m = materialOf(v); if (!m || !mats.includes(m)) errors.push(`line ${n}, material: “${v}” is not recognised (use ${mats.slice().sort().join(", ")} or a name such as “cast iron”)`); else rec.mat = m; }
+    v = get("soil_corrosivity");
+    if (v) { const so = soilOf(v); if (!so || !soils.includes(so)) errors.push(`line ${n}, soil_corrosivity: use one of ${soils.slice().sort().join(", ")}`); else rec.soil = so; }
     const fy = get("failure_years");
     if (fy) {
-      if (/^(none|0)$/i.test(fy)) e.failYears = [];
-      else {
-        const ys = fy.split(";").map(x => x.trim()).filter(Boolean).map(Number);
-        if (ys.some(y => !Number.isFinite(y))) errors.push(`line ${line}, failure_years: use years separated by “;”, or “none”`);
-        else e.failYears = ys.map(Math.trunc);
-      }
+      if (["none", "0", "-", "no", "nil"].includes(fy.toLowerCase())) rec.failYears = [];
+      else { const ys = splitList(fy).map(yearOf);
+        if (ys.some(y => y === null || y < 1800 || y > ref)) errors.push(`line ${n}, failure_years: use years or dates separated by “;”, or “none”`);
+        else rec.failYears = ys; }
     }
-    edits[id] = e;
+    if (!known.has(pipe)) { if (!unknown.includes(pipe)) unknown.push(pipe); return; }
+    if (!groups.has(pipe)) groups.set(pipe, []);
+    groups.get(pipe).push(rec);
   });
-  return { errors, edits, unknown };
+  const edits = {}; let combined = 0;
+  for (const [pipe, recs0] of groups) {
+    combined += recs0.length - 1;
+    const recs = recs0.map((r, i) => [r, i]).sort((a, b) => ((a[0].insp ?? -1) - (b[0].insp ?? -1)) || a[1] - b[1]).map(x => x[0]);
+    const merged = {}, years = []; let given = false;
+    for (const r of recs) {
+      for (const [k, val] of Object.entries(r)) if (k !== "failYears") merged[k] = val;
+      if (r.failYears) { given = true; for (const y of r.failYears) if (!years.includes(y)) years.push(y); }
+    }
+    if (given) merged.failYears = years.slice().sort((a, b) => a - b);
+    edits[pipe] = merged;
+  }
+  const info = { rows: [...groups.values()].reduce((a, g) => a + g.length, 0), pipes: groups.size, combined,
+                 separator: { ",": "comma", ";": "semicolon", "\t": "tab" }[delim],
+                 ignored: head.filter(h => !KNOWN.includes(h)) };
+  return { errors, edits, unknown, info };
 }
 // --- sensors: mirrors physical.pipes_near_sensor (pressure sensor within 2 links of a pipe end)
 const SENSOR_SHORT = { PressureSensor: "pressure", FlowSensor: "flow", LevelSensor: "level", AMRMeter: "amr" };
@@ -611,12 +652,12 @@ function sensorCsv(D) {
   return toCsv(rows);
 }
 function parseSensors(text, D) {
-  const rows = parseCsv(text), errors = [], layout = {};
-  if (!rows.length) return { errors: ["the file is empty"], layout };
-  const head = rows[0].map(h => h.trim().toLowerCase()), ce = head.indexOf("element"), ct = head.indexOf("type");
-  if (ce < 0 || ct < 0) return { errors: ["the first row must contain 'element' and 'type' columns"], layout };
+  const { head, rows } = parseTable(text), errors = [], layout = {};
+  if (!head.length) return { errors: ["the file is empty"], layout };
+  const ce = head.indexOf("element"), ct = head.indexOf("type");
+  if (ce < 0 || ct < 0) return { errors: ["the first row needs an element column (for example “element” or “node”) and a type column"], layout };
   const known = new Set([...D.nodes.map(n => n[0]), ...D.pipes.map(p => p.id), ...(D.devices || []).map(d => d.id)]);
-  rows.slice(1).forEach((r, k) => {
+  rows.forEach((r, k) => {
     const elem = (r[ce] || "").trim(), typ = (r[ct] || "").trim();
     if (!elem) return;
     const cls = SENSOR_CLASS[typ.toLowerCase().replace(/[\s_]/g, "")];
@@ -642,12 +683,15 @@ function openNetwork(D, label) {
   main(D);
   document.getElementById("loadStatus").textContent = label || "";
 }
+const esc0 = s => String(s).replace(/[&<>"]/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]));
 async function loadFile(file) {
   const st = document.getElementById("loadStatus");
   try {
     if (window.__woDirty && window.__woDirty() && !confirm("Opening another network discards your unsaved edits. Continue?")) return;
-    if (/\.inp$/i.test(file.name))
-      throw new Error("this is an EPANET model; build it first in Python or Colab (python -m wateront web --inp your.inp --json) and open the .json here");
+    if (/\.inp$/i.test(file.name)) {
+      st.innerHTML = `${esc0(file.name)} is an EPANET model. Convert it first with the <a href="https://colab.research.google.com/github/manuelhf/WaterOnt/blob/main/demo/WaterOnt_convert.ipynb" target="_blank" rel="noopener">one-click converter in Google Colab</a> (upload the .inp, optionally your asset register or inspection log, press Run, download the .json), then open the .json here.`;
+      return;
+    }
     openNetwork(JSON.parse(await file.text()), `Opened ${file.name}. The file was read in your browser and not uploaded anywhere.`);
   } catch (err) {
     st.textContent = `Couldn’t open ${file.name}: ${err.message}`;
@@ -1340,8 +1384,11 @@ function main(D) {
     let n = 0;
     for (const [id, edit] of Object.entries(res.edits)) if (Object.keys(edit).length) { editPipe(pipeIndex[id], edit); n++; }
     afterEdit();
-    $("importStatus").innerHTML = `<div class="msg">Updated ${n} pipe(s) from ${esc(file.name)}.` +
-      (res.unknown.length ? ` Skipped ${res.unknown.length} row(s) for pipes not in ${esc(D.network)}, e.g. ${res.unknown.slice(0, 3).map(esc).join(", ")}.` : "") + `</div>`;
+    const inf = res.info || {};
+    $("importStatus").innerHTML = `<div class="msg">Updated ${n} pipe(s) from ${esc(file.name)} (${esc(inf.separator || "comma")}-separated).` +
+      (inf.combined ? ` Combined ${inf.combined} extra row(s) for pipes listed more than once: the latest inspection wins.` : "") +
+      (res.unknown.length ? ` Skipped ${res.unknown.length} pipe(s) not in ${esc(D.network)}, e.g. ${res.unknown.slice(0, 3).map(esc).join(", ")}.` : "") +
+      (inf.ignored && inf.ignored.length ? ` Columns not used: ${inf.ignored.map(esc).join(", ")}.` : "") + `</div>`;
   };
 
   $("colorBy").onchange = paint;

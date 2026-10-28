@@ -205,14 +205,16 @@ def load_sensors(path: str, wn: wntr.network.WaterNetworkModel) -> dict[str, lis
     """Sensor list CSV with columns `element,type` (type: pressure, flow, level or amr, or
     the class names). The file is the complete sensor layout and replaces any sensors
     marked in the .inp. Raises ValueError listing every bad row."""
-    import pandas as pd
-    df = pd.read_csv(path, dtype=str, keep_default_na=False)
-    if not {"element", "type"} <= set(df.columns):
-        raise ValueError(f"{path}: needs columns 'element' and 'type'")
+    from .tables import read_table
+    head, rows, _ = read_table(path)
+    if "element" not in head or "type" not in head:
+        raise ValueError(f"{path}: needs an element column (for example 'element' or 'node') and a 'type' column")
+    ce, ct = head.index("element"), head.index("type")
     out: dict[str, list[tuple[str, str]]] = defaultdict(list)
     errors = []
-    for n, r in enumerate(df.to_dict("records"), start=2):
-        elem, typ = r["element"].strip(), r["type"].strip()
+    for n, r in enumerate(rows, start=2):
+        elem = r[ce].strip() if ce < len(r) else ""
+        typ = r[ct].strip() if ct < len(r) else ""
         if not elem:
             continue
         cls = SENSOR_ALIASES.get(typ.lower().replace(" ", "").replace("_", ""))
