@@ -705,7 +705,7 @@ function toBase64(bytes) {
 }
 async function colabCode(files) {
   // files: [{ name, bytes: Uint8Array }], the .inp first
-  const safe = n => n.replace(/[^A-Za-z0-9._ -]/g, "_").replace(/^\.+/, "") || "file";
+  const safe = n => n.replace(/[^A-Za-z0-9._ ()\[\]-]/g, "_").replace(/^\.+/, "") || "file";
   const lines = [];
   for (const f of files) {
     const b64 = toBase64(await gzipBytes(f.bytes)), parts = [];
@@ -855,7 +855,10 @@ function main(D) {
   let placing = false;
   const hasStart = (elem, cls) => (sensorStart[elem] || []).includes(cls);
 
-  $("netlabel").textContent = `${D.network}: ${D.pipes.length} pipes, ${D.graph.nodes.toLocaleString()} graph nodes`;
+  const count = (t, one) => { const k = D.nodes.filter(n => n[3] === t).length; return k ? `${k.toLocaleString()} ${one}${k > 1 ? "s" : ""}` : ""; };
+  $("netlabel").textContent = `${D.network}: ` + [`${D.pipes.length.toLocaleString()} pipes`, count("J", "junction"),
+    count("R", "reservoir"), count("T", "tank")].filter(Boolean).join(", ") +
+    ` · knowledge graph of ${D.graph.nodes.toLocaleString()} nodes`;
   $("footnote").textContent = `Asset records synthetic (seed ${D.config.seed}); policy clauses paraphrased.` +
     (D.notice && /EUPL/.test(D.notice) ? ` Network © KIOS, EUPL-1.2.` : "");
 
