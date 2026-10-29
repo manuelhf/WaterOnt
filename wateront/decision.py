@@ -123,6 +123,7 @@ def pipe_facts(kg: KnowledgeGraph, pipe_uid: str) -> dict:
     zone = kg.one(pipe_uid, "IN_ZONE")
     return dict(pipe=kg.node(pipe_uid)["name"], uid=pipe_uid, material=ar["material"],
                 material_source=ar.get("materialSource", "prior"),
+                provided=[x for x in ar.get("providedFields", "").split(",") if x],
                 monitored=(kg.node(ms)["band"] == "Monitored") if ms else None,
                 zone=kg.node(zone)["name"] if zone else None,
                 age=ar["age"], design_life=ar["designLife"], condition_grade=ar["conditionGrade"],

@@ -30,7 +30,10 @@ from .physical import link_uid
 
 ASSET_COLUMNS = ["pipe", "install_year", "material", "lining", "joint", "soil_corrosivity",
                  "condition_grade", "last_inspection_year", "failure_years", "failure_modes",
-                 "material_source"]
+                 "material_source", "provided"]
+# attributes a user's files can supply; "provided" lists those that did, per pipe (the rest is synthetic)
+PROVIDED_KEYS = ("install_year", "material", "condition_grade", "last_inspection_year", "failure_years",
+                 "soil_corrosivity")
 
 
 def weibull_cum_hazard(t: np.ndarray | float, beta: float, eta: float):
@@ -87,7 +90,7 @@ def synthesise_asset_table(wn: wntr.network.WaterNetworkModel, cfg: Config) -> p
                          lining=cfg.lining[material], joint=cfg.joint[material],
                          soil_corrosivity=soil, condition_grade=grade,
                          last_inspection_year=max(last_insp, year),
-                         failure_years=fyears, failure_modes=fmodes, material_source=source))
+                         failure_years=fyears, failure_modes=fmodes, material_source=source, provided=[]))
     return pd.DataFrame(rows, columns=ASSET_COLUMNS)
 
 
@@ -213,6 +216,7 @@ def apply_asset_overrides(assets: pd.DataFrame, overrides: dict[str, dict], cfg:
         if not rec:
             continue
         row.update(rec)
+        row["provided"] = sorted(set(row.get("provided") or []) | {k for k in rec if k in PROVIDED_KEYS})
         if "material" in rec:          # derived attributes follow the material unless given
             if "lining" not in rec:
                 row["lining"] = cfg.lining[rec["material"]]
@@ -276,6 +280,7 @@ def apply_failure_history(assets: pd.DataFrame, events: dict[str, list[tuple[int
     df = assets.copy()
     df["failure_years"] = [sorted(y for y, _ in events.get(p, [])) for p in df["pipe"]]
     df["failure_modes"] = [[m for _, m in sorted(events.get(p, []))] for p in df["pipe"]]
+    df["provided"] = [sorted(set(v or []) | {"failure_years"}) for v in df["provided"]]   # complete record for every pipe
     return df
 
 
@@ -293,7 +298,8 @@ def build_asset_layer(wn: wntr.network.WaterNetworkModel, kg: KnowledgeGraph,
                           conditionGrade=int(r.condition_grade),
                           lastInspectionYear=int(r.last_inspection_year),
                           failureCount=len(r.failure_years), recordVersion=1,
-                          materialSource=getattr(r, "material_source", "prior"))
+                          materialSource=getattr(r, "material_source", "prior"),
+                          providedFields=",".join(getattr(r, "provided", None) or []))
         kg.add_edge(pid, "HAS_ASSET_RECORD", aid)
         for k, (yr, mode) in enumerate(zip(r.failure_years, r.failure_modes)):
             fid = kg.add_node(f"FE:{r.pipe}:{k}", "FailureEvent", mode, year=int(yr), failureMode=mode)

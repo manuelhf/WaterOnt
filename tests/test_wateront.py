@@ -538,3 +538,15 @@ def test_converter_says_which_attributes_are_still_synthetic(tmp_path):
     text = "\n".join(summary)
     assert "covers 2 of 117 pipes" in text and "1 rows name pipes not in the model" in text
     assert "installation years, materials" in text and "still SYNTHETIC" in text
+
+
+def test_provenance_records_which_attributes_came_from_the_users_files():
+    """The explorer's data note depends on this: per pipe, the attributes from the user's
+    files; everything else is synthetic."""
+    from wateront.pipeline import build_knowledge_graph
+    from wateront.web_export import export_payload
+    plain = {p["id"]: p["reg"] for p in export_payload(build_knowledge_graph("Net3", verbose=False))["pipes"]}
+    assert all(v == [] for v in plain.values())                                   # all synthetic
+    res = build_knowledge_graph("Net3", asset_csv=os.path.join(FIX, "inspection_log.csv"), verbose=False)
+    reg = {p["id"]: p["reg"] for p in export_payload(res)["pipes"]}
+    assert reg["101"] == ["condition_grade", "last_inspection_year"] and reg["111"] == []

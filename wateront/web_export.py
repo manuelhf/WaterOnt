@@ -52,7 +52,7 @@ def export_payload(res: BuildResult, cfg: Config | None = None) -> dict:
         pipes.append(dict(
             id=name, s=idx[link.start_node_name], e=idx[link.end_node_name],
             len=round(f["length"], 1), dia=round(f["diameter"]), mat=f["material"],
-            msrc=f["material_source"], age=f["age"], grade=f["condition_grade"],
+            msrc=f["material_source"], reg=f["provided"], age=f["age"], grade=f["condition_grade"],
             insp=f["last_inspection_year"], fails=f["failure_count"],
             pofKm=round(float(r.pof_km), 6), pof=round(float(r.pof), 4),
             pofBand=f["pof_band"], hyd=f["hydraulic"], svc=f["service"],

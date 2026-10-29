@@ -55,6 +55,9 @@ header.bar {
 .brand { display: flex; align-items: baseline; gap: 10px; margin-right: auto; }
 .brand h1 { font-size: 19px; font-weight: 700; letter-spacing: -0.01em; margin: 0; }
 .brand span { color: var(--ink-2); font-size: 14px; }
+.datanote { flex-basis: 100%; margin: 0; font-size: 13px; color: var(--ink-2); line-height: 1.45; }
+.datanote b { color: var(--ink); }
+.datanote button { font: inherit; color: inherit; text-decoration: underline; background: none; border: 0; padding: 0; cursor: pointer; }
 .bar label { font-size: 14px; color: var(--ink-2); display: flex; align-items: center; gap: 8px; }
 .bar select { background: var(--bg); border: 1px solid var(--line); border-radius: 6px; padding: 5px 8px; }
 
@@ -255,6 +258,7 @@ footer.note { font-size: 12.5px; color: var(--ink-2); padding: 12px 20px; border
     </details>
     <input type="file" id="openFile" accept=".json,application/json" hidden>
     <span id="loadStatus" role="status" aria-live="polite"></span>
+    <p id="dataNote" class="datanote" role="note"></p>
   </header>
 
   <div class="mapwrap" id="mapwrap">
@@ -367,7 +371,7 @@ footer.note { font-size: 12.5px; color: var(--ink-2); padding: 12px 20px; border
   <form method="dialog">
     <h2>Use your own EPANET model</h2>
     <ol class="steps">
-      <li><b>Choose your files.</b> Your model (.inp) and, if you have them, CSV files with your data: an asset register or inspection log, a failure list, a sensor layout, or critical customers. Column names need not match the templates exactly.</li>
+      <li><b>Choose your files.</b> Your model (.inp) and, if you have them, CSV files with your data: an asset register or inspection log, a failure list, a sensor layout, or critical customers. Column names need not match the templates exactly.<br><b>Note:</b> an EPANET model holds no asset information (pipe ages, materials, condition, inspections, failures). Whatever your files do not provide, WaterOnt fills with <b>synthetic, illustrative values</b>, so the recommendations show how the method works rather than the state of your network. You can add records later in the Data tab.</li>
       <li><b>Copy the code and run it in Google Colab.</b> Press <i>Copy code</i>, then <i>Open Google Colab</i>, paste into the empty cell (Ctrl+V, ⌘V on a Mac) and run it (Shift+Enter). It needs a Google account and takes about a minute. Your files are inside the code and are processed only in your own Colab session.</li>
       <li><b>Open the result here.</b> Colab downloads a network file (.json): open it with <i>Open the downloaded file</i>.</li>
     </ol>
@@ -519,7 +523,11 @@ function pofKmOf(p, cfg) {
   const mult = Math.exp(cfg.failureCoef * p.fails) * cfg.soilFactor[p.soil];
   return 1 - Math.exp(-dH * cfg.hazardScale * mult);
 }
-const EDIT_FIELDS = ["age", "mat", "grade", "insp", "fails", "failYears", "failModes", "soil", "msrc", "pofKm", "pof"];
+const EDIT_FIELDS = ["age", "mat", "grade", "insp", "fails", "failYears", "failModes", "soil", "msrc", "pofKm", "pof", "reg"];
+// which asset attributes came from the user's files or edits (the rest is synthetic)
+const EDIT_TO_FIELD = { installYear: "install_year", mat: "material", grade: "condition_grade", insp: "last_inspection_year",
+                        failYears: "failure_years", soil: "soil_corrosivity" };
+const providedOf = p => p.reg || (p.msrc === "register" ? ["material"] : []);
 function applyEdit(p, e, cfg) {
   // e: any of {installYear, mat, grade, insp, failYears, soil}; returns a new pipe object
   const q = { ...p };
@@ -859,6 +867,7 @@ function main(D) {
   $("netlabel").textContent = `${D.network}: ` + [`${D.pipes.length.toLocaleString()} pipes`, count("J", "junction"),
     count("R", "reservoir"), count("T", "tank")].filter(Boolean).join(", ") +
     ` · knowledge graph of ${D.graph.nodes.toLocaleString()} nodes`;
+  updateDataNote();
   $("footnote").textContent = `Asset records synthetic (seed ${D.config.seed}); policy clauses paraphrased.` +
     (D.notice && /EUPL/.test(D.notice) ? ` Network © KIOS, EUPL-1.2.` : "");
 
@@ -1205,13 +1214,37 @@ function main(D) {
   function editPipe(i, e) {
     const p = D.pipes[i];
     if (!isEdited(p.id)) originals[p.id] = Object.fromEntries(EDIT_FIELDS.map(k => [k, p[k]]));
-    D.pipes[i] = applyEdit(p, e, { ...D.config, referenceYear: policy.referenceYear });
+    const q = applyEdit(p, e, { ...D.config, referenceYear: policy.referenceYear });
+    q.reg = [...new Set([...providedOf(p), ...Object.keys(e).filter(k => k in EDIT_TO_FIELD).map(k => EDIT_TO_FIELD[k])])].sort();
+    D.pipes[i] = q;
     dirty = true;
+  }
+  function updateDataNote() {
+    const LABEL = { install_year: "installation years", material: "materials", condition_grade: "condition grades",
+                    last_inspection_year: "inspection dates", failure_years: "failure records", soil_corrosivity: "soil" };
+    const n = D.pipes.length, and = xs => xs.length > 1 ? `${xs.slice(0, -1).join(", ")} and ${xs[xs.length - 1]}` : xs[0];
+    const count = Object.fromEntries(Object.keys(LABEL).map(k => [k, D.pipes.filter(p => providedOf(p).includes(k)).length]));
+    const core = ["install_year", "material", "condition_grade", "last_inspection_year"];
+    let text;
+    if (Object.values(count).every(c => !c))
+      text = `Asset data (pipe ages, materials, condition, inspections, failures) are synthetic for all ${n.toLocaleString()} pipes, so the recommendations are illustrative.`;
+    else if (core.every(k => count[k] === n))
+      text = `Asset data come from your files for all ${n.toLocaleString()} pipes.`;
+    else {
+      const byCount = {};
+      for (const k of Object.keys(LABEL)) if (count[k]) (byCount[count[k]] = byCount[count[k]] || []).push(LABEL[k]);
+      const parts = Object.keys(byCount).map(Number).sort((a, b) => b - a)
+        .map(c => `${and(byCount[c])} for ${c === n ? "all" : c.toLocaleString()} pipe${c > 1 ? "s" : ""}`);
+      text = `Asset data from your files: ${parts.join("; ")} (of ${n.toLocaleString()}). Everything else is synthetic, so the recommendations are illustrative.`;
+    }
+    $("dataNote").innerHTML = `<b>Research demonstrator.</b> ${esc(text)} The maintenance policy is illustrative. <button type="button" id="dataNoteBtn">Add your records</button>`;
+    $("dataNoteBtn").onclick = () => showTab("data");
   }
   function afterEdit() {
     baseline = D.pipes.map(p => decide(p, basePolicy));
     recompute();
     renderEdits();
+    updateDataNote();
   }
   function trailMarkdown(i) {
     const p = D.pipes[i], d = decisions[i];
