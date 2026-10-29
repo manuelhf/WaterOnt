@@ -198,7 +198,8 @@ def test_register_reading_matches_python(built, tmp_path):
     """The explorer reads asset registers and inspection logs exactly as asset.py does."""
     from wateront.asset import load_asset_overrides
     from wateront.config import Config
-    fixtures = ["register_excel_semicolon.csv", "inspection_log.csv", "register_tabs.csv", "register_bad.csv"]
+    fixtures = ["register_excel_semicolon.csv", "inspection_log.csv", "register_tabs.csv", "register_bad.csv",
+                "register_dma.csv"]
     tpl = open(os.path.join(ROOT, "wateront", "web_template.html"), encoding="utf-8").read()
     logic = re.search(r"// LOGIC START[^\n]*\n(.*?)// LOGIC END", tpl, re.S).group(1)
     cfg = Config()
@@ -213,7 +214,7 @@ console.log(JSON.stringify(files.map(f => parseRegister(fs.readFileSync(f, 'utf8
     js = json.loads(subprocess.run(["node", str(tmp_path / "r.js"), str(tmp_path / "in.json")],
                                    capture_output=True, text=True, check=True).stdout)
     key = {"install_year": "installYear", "condition_grade": "grade", "last_inspection_year": "insp",
-           "material": "mat", "soil_corrosivity": "soil", "failure_years": "failYears"}
+           "material": "mat", "soil_corrosivity": "soil", "failure_years": "failYears", "dma": "dma"}
     for f, path, j in zip(fixtures, paths, js):
         try:
             py = load_asset_overrides(path, cfg)
@@ -294,3 +295,12 @@ const fs = require('fs');
     assert open(work / "Net3.inp", "rb").read() == open(inp, "rb").read()
     ref, _ = convert([inp, log], out_dir=str(tmp_path / "ref"))
     assert downloaded and json.load(open(downloaded[0])) == json.load(open(ref))
+
+
+def test_web_parity_with_user_dmas(tmp_path):
+    """DMAs from a register: the explorer places pipes and answers DMA questions as Python does."""
+    from wateront.pipeline import build_knowledge_graph
+    res = build_knowledge_graph("Net3", asset_csv=os.path.join(ROOT, "tests", "fixtures", "register_dma.csv"), verbose=False)
+    check(res, ["Which pipes in DMA North-1 need attention?", "Show the pipes in zone South-2",
+                "Which pipes in district North-1 should be replaced?", "Which pipes in the zone fed by the tank need intervention?",
+                "Which pipes should be replaced?"], tmp_path)

@@ -13,7 +13,7 @@ from .asset import (apply_asset_overrides, apply_failure_history, build_asset_la
 from .config import Config
 from .decision import Decision, build_decision_layer, load_guidelines
 from .kg import KnowledgeGraph
-from .physical import (build_instrumentation, build_physical_layer, build_pressure_zones,
+from .physical import (apply_dma_zones, build_instrumentation, build_physical_layer, build_pressure_zones,
                        load_sensors, pipes_near_sensor)
 from .risk import (apply_likelihood_scores, build_risk_layer, choose_critical_facilities,
                    compute_risk_table)
@@ -82,6 +82,11 @@ def build_knowledge_graph(inp: str, cfg: Config | None = None, asset_csv: str | 
         log(f"[asset]    observed failure history from {failures_csv}: "
             f"{sum(map(len, events.values()))} events on {len(events)} pipes")
     build_asset_layer(wn, kg, assets, cfg)
+    dmas = {r.pipe: r.dma for r in assets.itertuples() if isinstance(r.dma, str) and r.dma.strip()}
+    if dmas:
+        moved = apply_dma_zones(kg, wn, network_id, dmas)
+        log(f"[zones]    {moved} pipes placed in {len(set(dmas.values()))} DMAs from the register; "
+            f"{len(assets) - moved} keep their automatic zone")
     log(f"[asset]    material provenance: "
         f"{assets['material_source'].str.split(':').str[:2].str.join(':').value_counts().to_dict()}")
     log(f"[asset]    {len(kg.nodes('AssetRecord'))} asset records, "

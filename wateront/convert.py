@@ -99,6 +99,14 @@ def convert(paths: list[str], out_dir: str = ".", seed: int = 42) -> tuple[str, 
             notes.append("Not in your file, so still SYNTHETIC for every pipe: " + ", ".join(missing) + ".")
         if matched < wn.num_pipes:
             notes.append(f"The other {wn.num_pipes - matched} pipes keep synthetic values for everything.")
+    dma_pipes = sum(1 for r in res.assets.itertuples() if isinstance(r.dma, str) and r.dma.strip())
+    if dma_pipes:
+        n_dma = len({r.dma for r in res.assets.itertuples() if isinstance(r.dma, str) and r.dma.strip()})
+        notes.append(f"Zones: your {n_dma} DMAs for {dma_pipes} pipes; the other {wn.num_pipes - dma_pipes} pipes "
+                     f"keep automatic zones (split at pumps and pressure/flow-control valves).")
+    else:
+        notes.append("Zones: automatic, split at pumps and pressure/flow-control valves in the model. "
+                     "Add a DMA column to your register to use your own DMAs.")
     if not one("failures") and not one("assets"):
         notes.append("No failure records: failure histories are synthetic.")
     if not res.kg.nodes("PressureSensor") and not one("sensors"):

@@ -30,10 +30,10 @@ from .physical import link_uid
 
 ASSET_COLUMNS = ["pipe", "install_year", "material", "lining", "joint", "soil_corrosivity",
                  "condition_grade", "last_inspection_year", "failure_years", "failure_modes",
-                 "material_source", "provided"]
+                 "material_source", "provided", "dma"]
 # attributes a user's files can supply; "provided" lists those that did, per pipe (the rest is synthetic)
 PROVIDED_KEYS = ("install_year", "material", "condition_grade", "last_inspection_year", "failure_years",
-                 "soil_corrosivity")
+                 "soil_corrosivity", "dma")
 
 
 def weibull_cum_hazard(t: np.ndarray | float, beta: float, eta: float):
@@ -90,7 +90,7 @@ def synthesise_asset_table(wn: wntr.network.WaterNetworkModel, cfg: Config) -> p
                          lining=cfg.lining[material], joint=cfg.joint[material],
                          soil_corrosivity=soil, condition_grade=grade,
                          last_inspection_year=max(last_insp, year),
-                         failure_years=fyears, failure_modes=fmodes, material_source=source, provided=[]))
+                         failure_years=fyears, failure_modes=fmodes, material_source=source, provided=[], dma=""))
     return pd.DataFrame(rows, columns=ASSET_COLUMNS)
 
 
@@ -118,7 +118,7 @@ def load_asset_overrides(path: str, cfg: Config | None = None, report: dict | No
     head, rows, delim = read_table(path)
     if "pipe" not in head:
         raise ValueError(f"{path}: needs a pipe column (for example 'pipe' or 'Pipe ID'); found {head}")
-    known = {"pipe", *REGISTER_INT, *REGISTER_TEXT, "failure_years", "failure_modes"}
+    known = {"pipe", *REGISTER_INT, *REGISTER_TEXT, "failure_years", "failure_modes", "dma"}
     col = {h: k for k, h in enumerate(head) if h in known and h not in {}}
     get = lambda r, c: (r[col[c]].strip() if c in col and col[c] < len(r) else "")
     ref, errors, groups = cfg.reference_year, [], {}
@@ -161,7 +161,7 @@ def load_asset_overrides(path: str, cfg: Config | None = None, report: dict | No
                 errors.append(f"line {n}, soil_corrosivity: use one of {sorted(cfg.soil_corrosivity_factor)}")
             else:
                 rec["soil_corrosivity"] = so
-        for c in ("lining", "joint"):
+        for c in ("lining", "joint", "dma"):
             if v := get(r, c):
                 rec[c] = v
         fy = get(r, "failure_years")

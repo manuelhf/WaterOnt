@@ -29,6 +29,8 @@ ALIASES = {
     "failure_modes": ["failure_mode", "burst_modes", "burst_mode"],
     "lining": ["liner", "lining_type"],
     "joint": ["joint_type", "joints"],
+    "dma": ["zone", "supply_zone", "district", "district_metered_area", "dma_id", "dma_name", "dma_code",
+            "zone_id", "zone_name", "pressure_zone", "sector"],
     "element": ["node", "junction", "location", "sensor_location", "asset"],
     "type": ["sensor_type", "kind", "customer_type", "facility_type", "category"],
 }

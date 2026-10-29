@@ -441,6 +441,7 @@ function decide(pipe, pol) {
 }
 const MATERIAL_WORDS = { "cast iron": "CI", "ductile": "DI", "asbestos": "AC", "pvc": "PVC",
                          "polyethylene": "HDPE", "hdpe": "HDPE", "steel": "Steel" };
+const ZONE_STOPWORDS = new Set(["a", "an", "and", "are", "by", "fed", "for", "has", "have", "in", "is", "mains", "need", "needs", "of", "or", "pipes", "served", "supplied", "that", "the", "where", "which", "with"]);
 function planRules(q) {
   const s = q.toLowerCase();
   const p = { actions: [], excludeMonitor: false, bands: {}, material: [], installedBefore: null,
@@ -462,6 +463,10 @@ function planRules(q) {
   if (/low (service |network )?pressure|pressure (deficit|margin)/.test(s)) p.lowPressure = true;
   if (/unmonitored|not monitored|no (pressure )?(sensor|monitoring)|without (a |any )?(pressure )?(sensor|monitoring)|monitoring gap|blind spot/.test(s)) p.unmonitored = true;
   p.zones = (q.match(/\b(PRV-\d+|PSV-\d+|PUMP_\w+|T\d+)\b/gi) || []);
+  for (const m of q.matchAll(/\b(?:dma|district|zone)\s+([A-Za-z0-9][A-Za-z0-9_.\-]*)/gi)) {
+    const name = m[1].replace(/\.+$/, "");
+    if (!ZONE_STOPWORDS.has(name.toLowerCase()) && !p.zones.includes(name)) p.zones.push(name);
+  }
   if (/tank (zone|area)|zone (fed|supplied|served) by the tank|storage zone/.test(s)) p.zones.push("tank");
   for (const [k, v] of Object.entries(MATERIAL_WORDS)) if (s.includes(k) && !p.material.includes(v)) p.material.push(v);
   let m;
@@ -523,10 +528,10 @@ function pofKmOf(p, cfg) {
   const mult = Math.exp(cfg.failureCoef * p.fails) * cfg.soilFactor[p.soil];
   return 1 - Math.exp(-dH * cfg.hazardScale * mult);
 }
-const EDIT_FIELDS = ["age", "mat", "grade", "insp", "fails", "failYears", "failModes", "soil", "msrc", "pofKm", "pof", "reg"];
+const EDIT_FIELDS = ["age", "mat", "grade", "insp", "fails", "failYears", "failModes", "soil", "msrc", "pofKm", "pof", "reg", "zone"];
 // which asset attributes came from the user's files or edits (the rest is synthetic)
 const EDIT_TO_FIELD = { installYear: "install_year", mat: "material", grade: "condition_grade", insp: "last_inspection_year",
-                        failYears: "failure_years", soil: "soil_corrosivity" };
+                        failYears: "failure_years", soil: "soil_corrosivity", dma: "dma" };
 const providedOf = p => p.reg || (p.msrc === "register" ? ["material"] : []);
 function applyEdit(p, e, cfg) {
   // e: any of {installYear, mat, grade, insp, failYears, soil}; returns a new pipe object
@@ -535,6 +540,7 @@ function applyEdit(p, e, cfg) {
   if (e.mat !== undefined && e.mat !== p.mat) { q.mat = e.mat; q.msrc = "edited"; }
   if (e.grade !== undefined) q.grade = e.grade;
   if (e.soil !== undefined) q.soil = e.soil;
+  if (e.dma !== undefined) q.zone = e.dma;
   if (e.insp !== undefined) q.insp = e.insp;
   if (e.failYears !== undefined) {
     q.failYears = e.failYears.slice().sort((a, b) => a - b);
@@ -549,15 +555,16 @@ function applyEdit(p, e, cfg) {
   return q;
 }
 const REGISTER_COLS = ["pipe", "install_year", "material", "soil_corrosivity", "condition_grade",
-                       "last_inspection_year", "failure_years", "failure_modes"];
+                       "last_inspection_year", "failure_years", "failure_modes", "dma"];
 const csvCell = v => /[",\n]/.test(String(v)) ? `"${String(v).replace(/"/g, '""')}"` : String(v);
 function toCsv(rows) { return rows.map(r => r.map(csvCell).join(",")).join("\n") + "\n"; }
 function toRegisterCsv(pipes, cfg) {
   return toCsv([REGISTER_COLS, ...pipes.map(p => [p.id, cfg.referenceYear - p.age, p.mat, p.soil, p.grade, p.insp,
-    p.failYears.length ? p.failYears.join(";") : "none", p.failModes.join(";")])]);
+    p.failYears.length ? p.failYears.join(";") : "none", p.failModes.join(";"),
+    (p.reg || []).includes("dma") ? p.zone : ""])]);
 }
 // --- tolerant table reading: mirrors wateront/tables.py (the parity tests check they agree)
-const TABLE_ALIASES = {"pipe": ["pipe_id", "pipeid", "id", "asset_id", "assetid", "link", "link_id", "pipe_name", "name", "main", "main_id"], "install_year": ["installation_year", "year_installed", "installed", "install_date", "installation_date", "year_laid", "laid", "install", "date_installed", "year_of_installation"], "material": ["pipe_material", "mat", "material_type"], "condition_grade": ["condition", "grade", "condition_score", "condition_rating", "cond_grade"], "last_inspection_year": ["last_inspection", "last_inspected", "inspection_year", "inspection_date", "date_inspected", "inspected", "inspection", "date_of_inspection", "survey_date", "survey_year", "last_survey"], "soil_corrosivity": ["soil", "corrosivity", "soil_corrosion", "soil_aggressivity"], "failure_years": ["failure_year", "failure_dates", "failure_date", "burst_years", "burst_dates"], "failure_modes": ["failure_mode", "burst_modes", "burst_mode"], "lining": ["liner", "lining_type"], "joint": ["joint_type", "joints"], "element": ["node", "junction", "location", "sensor_location", "asset"], "type": ["sensor_type", "kind", "customer_type", "facility_type", "category"]};
+const TABLE_ALIASES = {"pipe": ["pipe_id", "pipeid", "id", "asset_id", "assetid", "link", "link_id", "pipe_name", "name", "main", "main_id"], "install_year": ["installation_year", "year_installed", "installed", "install_date", "installation_date", "year_laid", "laid", "install", "date_installed", "year_of_installation"], "material": ["pipe_material", "mat", "material_type"], "condition_grade": ["condition", "grade", "condition_score", "condition_rating", "cond_grade"], "last_inspection_year": ["last_inspection", "last_inspected", "inspection_year", "inspection_date", "date_inspected", "inspected", "inspection", "date_of_inspection", "survey_date", "survey_year", "last_survey"], "soil_corrosivity": ["soil", "corrosivity", "soil_corrosion", "soil_aggressivity"], "failure_years": ["failure_year", "failure_dates", "failure_date", "burst_years", "burst_dates"], "failure_modes": ["failure_mode", "burst_modes", "burst_mode"], "lining": ["liner", "lining_type"], "joint": ["joint_type", "joints"], "dma": ["zone", "supply_zone", "district", "district_metered_area", "dma_id", "dma_name", "dma_code", "zone_id", "zone_name", "pressure_zone", "sector"], "element": ["node", "junction", "location", "sensor_location", "asset"], "type": ["sensor_type", "kind", "customer_type", "facility_type", "category"]};
 const ALIAS_OF = Object.fromEntries(Object.entries(TABLE_ALIASES).flatMap(([c, names]) => names.map(a => [a, c])));
 const MATERIAL_NAMES = {"ci": "CI", "castiron": "CI", "greyiron": "CI", "grayiron": "CI", "spuniron": "CI", "iron": "CI", "di": "DI", "ductileiron": "DI", "ductile": "DI", "sgiron": "DI", "ac": "AC", "asbestoscement": "AC", "asbestos": "AC", "fibrecement": "AC", "fibercement": "AC", "pvc": "PVC", "upvc": "PVC", "pvcu": "PVC", "mpvc": "PVC", "pvco": "PVC", "polyvinylchloride": "PVC", "hdpe": "HDPE", "pe": "HDPE", "mdpe": "HDPE", "polyethylene": "HDPE", "polyethene": "HDPE", "pe80": "HDPE", "pe100": "HDPE", "alkathene": "HDPE", "steel": "Steel", "st": "Steel", "galvanisedsteel": "Steel", "galvanizedsteel": "Steel"};
 const SOIL_NAMES = {"low": "Low", "medium": "Medium", "med": "Medium", "moderate": "Medium", "high": "High"};
@@ -600,7 +607,7 @@ function parseRegister(text, pipeIds, cfg) {
   const { head, rows, delim } = parseTable(text);
   if (!head.length) return { errors: ["the file is empty"], edits: {}, unknown: [], info: {} };
   if (!head.includes("pipe")) return { errors: ["the first row needs a pipe column (for example “pipe” or “Pipe ID”)"], edits: {}, unknown: [], info: {} };
-  const KNOWN = ["pipe", "install_year", "condition_grade", "last_inspection_year", "material", "lining", "joint", "soil_corrosivity", "failure_years", "failure_modes"];
+  const KNOWN = ["pipe", "install_year", "condition_grade", "last_inspection_year", "material", "lining", "joint", "soil_corrosivity", "failure_years", "failure_modes", "dma"];
   const col = Object.fromEntries(head.map((h, k) => [h, k]).filter(([h]) => KNOWN.includes(h)).reverse());
   const ref = cfg.referenceYear, errors = [], groups = new Map(), unknown = [], known = new Set(pipeIds), mats = Object.keys(cfg.weibull), soils = Object.keys(cfg.soilFactor);
   rows.forEach((r, k) => {
@@ -621,6 +628,7 @@ function parseRegister(text, pipeIds, cfg) {
     if (v) { const m = materialOf(v); if (!m || !mats.includes(m)) errors.push(`line ${n}, material: “${v}” is not recognised (use ${mats.slice().sort().join(", ")} or a name such as “cast iron”)`); else rec.mat = m; }
     v = get("soil_corrosivity");
     if (v) { const so = soilOf(v); if (!so || !soils.includes(so)) errors.push(`line ${n}, soil_corrosivity: use one of ${soils.slice().sort().join(", ")}`); else rec.soil = so; }
+    const dm = get("dma"); if (dm) rec.dma = dm;
     const fy = get("failure_years");
     if (fy) {
       if (["none", "0", "-", "no", "nil"].includes(fy.toLowerCase())) rec.failYears = [];
@@ -1216,12 +1224,13 @@ function main(D) {
     if (!isEdited(p.id)) originals[p.id] = Object.fromEntries(EDIT_FIELDS.map(k => [k, p[k]]));
     const q = applyEdit(p, e, { ...D.config, referenceYear: policy.referenceYear });
     q.reg = [...new Set([...providedOf(p), ...Object.keys(e).filter(k => k in EDIT_TO_FIELD).map(k => EDIT_TO_FIELD[k])])].sort();
+    if (e.dma && !D.zones.some(z => z.id === e.dma)) D.zones.push({ id: e.dma, nJunctions: 0, storage: false });
     D.pipes[i] = q;
     dirty = true;
   }
   function updateDataNote() {
     const LABEL = { install_year: "installation years", material: "materials", condition_grade: "condition grades",
-                    last_inspection_year: "inspection dates", failure_years: "failure records", soil_corrosivity: "soil" };
+                    last_inspection_year: "inspection dates", failure_years: "failure records", soil_corrosivity: "soil", dma: "DMAs" };
     const n = D.pipes.length, and = xs => xs.length > 1 ? `${xs.slice(0, -1).join(", ")} and ${xs[xs.length - 1]}` : xs[0];
     const count = Object.fromEntries(Object.keys(LABEL).map(k => [k, D.pipes.filter(p => providedOf(p).includes(k)).length]));
     const core = ["install_year", "material", "condition_grade", "last_inspection_year"];
@@ -1302,7 +1311,8 @@ function main(D) {
     if (pl.maxDia !== null) parts.push(`diameter below ${pl.maxDia} mm`);
     if (pl.lowPressure) parts.push(`minimum pressure below ${D.config.minServicePressure + D.config.pressureMargin} m`);
     if (pl.unmonitored) parts.push("no pressure sensor within two segments");
-    if (pl.zones.length) parts.push(`in the zone fed by ${pl.zones.join(", ")}`);
+    for (const z of pl.zones)       // device-named zones are "fed by" the device; DMAs are named directly
+      parts.push(/^(PRV-|PSV-|PUMP_|T\d|tank$|storage$)/i.test(z) ? `in the zone fed by ${z}` : `in zone ${z}`);
     if (pl.pipes.length) parts.push(`pipe ${pl.pipes.join(", ")}`);
     return parts;
   }
@@ -1528,8 +1538,8 @@ function main(D) {
   }
   $("importBtn").onclick = () => $("importFile").click();
   $("templateBtn").onclick = () => download("asset_register_template.csv",
-    toCsv([REGISTER_COLS, [D.pipes[0].id, 1962, "CI", "Medium", 4, 2019, "2011;2020", "Burst;JointFailure"],
-           [D.pipes[1 % D.pipes.length].id, "", "", "", 2, "", "none", ""]]), "text/csv");
+    toCsv([REGISTER_COLS, [D.pipes[0].id, 1962, "CI", "Medium", 4, 2019, "2011;2020", "Burst;JointFailure", "DMA-1"],
+           [D.pipes[1 % D.pipes.length].id, "", "", "", 2, "", "none", "", ""]]), "text/csv");
   $("importFile").onchange = async e => {
     const file = e.target.files[0]; e.target.value = "";
     if (!file) return;

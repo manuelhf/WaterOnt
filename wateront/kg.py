@@ -62,6 +62,10 @@ class KnowledgeGraph:
         if not any(d["rel"] == rel for d in self.g.get_edge_data(src, dst, default={}).values()):
             self.g.add_edge(src, dst, key=rel, rel=rel, **props)
 
+    def remove_edge(self, src: str, rel: str, dst: str) -> None:
+        if self.g.has_edge(src, dst, key=rel):
+            self.g.remove_edge(src, dst, key=rel)
+
     # ------------------------------------------------------------------- read
     def node(self, node_id: str) -> dict:
         return self.g.nodes[node_id]

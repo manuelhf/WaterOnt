@@ -23,7 +23,7 @@ synthetic asset histories. Use it to explore and to give feedback, not for opera
 
 Prefer a reusable notebook? The [converter notebook](https://colab.research.google.com/github/manuelhf/WaterOnt/blob/main/demo/WaterOnt_convert.ipynb) does the same with an upload button, and `python -m wateront convert model.inp register.csv` does it on your own computer.
 
-Files do not have to follow the templates in [`data/`](data/) exactly: column names such as "Pipe ID", "Last inspection" or "Installation year" are recognised; dates can stand in for years; materials can be written as names ("cast iron", "uPVC", "MDPE"); Excel CSV files with commas, semicolons or tabs all work. An inspection log may list a pipe several times: the most recent inspection wins. A file with any invalid value is rejected as a whole, with every problem listed, so a register is never half-applied.
+Files do not have to follow the templates in [`data/`](data/) exactly: column names such as "Pipe ID", "Last inspection" or "Installation year" are recognised; dates can stand in for years; materials can be written as names ("cast iron", "uPVC", "MDPE"); Excel CSV files with commas, semicolons or tabs all work. An inspection log may list a pipe several times: the most recent inspection wins. Supply zones are found automatically from the model (split at pumps and pressure/flow-control valves); to use your own DMAs, add a DMA column (or "Zone", "District") to the register, and those pipes move to your DMAs while the rest keep their automatic zone. Questions such as "Which pipes in DMA North-3 need intervention?" then work. A file with any invalid value is rejected as a whole, with every problem listed, so a register is never half-applied.
 
 ## Paper → code map
 

@@ -19,6 +19,8 @@ from .decision import ACTIONS
 from .kg import KnowledgeGraph
 from .retrieval import Evidence, GraphRetriever, VectorIndex
 
+ZONE_STOPWORDS = {"fed", "supplied", "served", "of", "by", "the", "a", "an", "with", "that", "in", "where",
+                  "which", "is", "are", "and", "or", "for", "need", "needs", "pipes", "mains", "has", "have"}
 MATERIAL_WORDS = {"cast iron": "CI", "ductile": "DI", "asbestos": "AC", "pvc": "PVC",
                   "polyethylene": "HDPE", "hdpe": "HDPE", "steel": "Steel"}
 
@@ -78,6 +80,10 @@ def plan_rules(q: str) -> QueryPlan:
                  r"(pressure )?(sensor|monitoring)|monitoring gap|blind spot", s):
         p.unmonitored = True
     p.zones = re.findall(r"\b(PRV-\d+|PSV-\d+|PUMP_\w+|T\d+)\b", q, flags=re.I)
+    for name in re.findall(r"\b(?:dma|district|zone)\s+([A-Za-z0-9][A-Za-z0-9_.\-]*)", q, flags=re.I):
+        name = name.rstrip(".")
+        if name.lower() not in ZONE_STOPWORDS and name not in p.zones:
+            p.zones.append(name)
     if re.search(r"tank (zone|area)|zone (fed|supplied|served) by the tank|storage zone", s):
         p.zones.append("tank")
     p.material = sorted({v for k, v in MATERIAL_WORDS.items() if k in s})

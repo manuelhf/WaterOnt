@@ -263,6 +263,33 @@ def pipes_near_sensor(wn: wntr.network.WaterNetworkModel, kg: KnowledgeGraph,
 
 
 # ----------------------------------------------------------------------------- zones
+def apply_dma_zones(kg: KnowledgeGraph, wn: wntr.network.WaterNetworkModel, network_id: str,
+                    dma_of_pipe: dict[str, str]) -> int:
+    """User-defined DMAs (from a 'dma' column in the asset register) replace the automatic
+    zone of the pipes they list; other pipes keep their automatic zone. Returns the number
+    of pipes moved."""
+    moved = 0
+    for name, dma in dma_of_pipe.items():
+        dma = str(dma).strip()
+        if not dma or name not in wn.link_name_list:
+            continue
+        zid = f"Zone:DMA:{dma}"
+        if not kg.has(zid):
+            kg.add_node(zid, "PressureZone", "DistrictMeteredArea", name=dma, isSupplyZone=True, nJunctions=0,
+                        totalDemand=0.0, containsStorage=False, zoneSource="register")
+            kg.add_edge(node_id("NET", network_id), "HAS_ZONE", zid)
+        pid = link_uid(wn, name)
+        for z in kg.out(pid, "IN_ZONE"):
+            kg.remove_edge(pid, "IN_ZONE", z)
+        kg.add_edge(pid, "IN_ZONE", zid)
+        moved += 1
+    for zid in kg.nodes("DistrictMeteredArea"):      # junctions reached by a DMA's pipes, for display
+        ends = {e for p in kg.inc(zid, "IN_ZONE") for e in kg.out(p, "STARTS_AT") + kg.out(p, "ENDS_AT")}
+        kg.node(zid)["nJunctions"] = sum(1 for e in ends if "Junction" in kg.node(e)["labels"])
+        kg.node(zid)["containsStorage"] = any("Tank" in kg.node(e)["labels"] for e in ends)
+    return moved
+
+
 def build_pressure_zones(wn: wntr.network.WaterNetworkModel, kg: KnowledgeGraph, network_id: str) -> dict[str, str]:
     """Hydraulic supply zones = connected components after removing pumps and
     pressure/flow control valves (the boundary devices between zones). Returns

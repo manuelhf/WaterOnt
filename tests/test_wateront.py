@@ -550,3 +550,14 @@ def test_provenance_records_which_attributes_came_from_the_users_files():
     res = build_knowledge_graph("Net3", asset_csv=os.path.join(FIX, "inspection_log.csv"), verbose=False)
     reg = {p["id"]: p["reg"] for p in export_payload(res)["pipes"]}
     assert reg["101"] == ["condition_grade", "last_inspection_year"] and reg["111"] == []
+
+
+def test_user_dmas_replace_automatic_zones_only_where_given():
+    from wateront.pipeline import build_knowledge_graph
+    from wateront.graphrag import GraphRAG
+    res = build_knowledge_graph("Net3", asset_csv=os.path.join(FIX, "register_dma.csv"), verbose=False)
+    rag = GraphRAG(res.kg, use_llm=False)
+    assert {e.facts["pipe"] for e in rag.ask("Which pipes in DMA North-1 need attention? top 50").recommendations} <= {"101", "105"}
+    zone = lambda p: res.kg.node(res.kg.one(f"P:{p}", "IN_ZONE"))["name"]
+    assert zone("101") == "North-1" and zone("111") == "South-2" and zone("113") != "" and "North" not in zone("113")
+    assert rag.ask("Which pipes in the zone fed by the tank need intervention?").plan.zones == ["tank"]
