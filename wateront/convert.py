@@ -3,8 +3,8 @@
 Used by demo/WaterOnt_convert.ipynb, so that colleagues without Python can open their own
 network in the explorer. Each CSV is recognised from its columns, not its name:
 
-    asset register / inspection log   a pipe column plus register columns
-                                      (install year, material, condition, last inspection, ...)
+    asset register / assessment log   a pipe column plus register columns
+                                      (install year, material, condition, last assessment, ...)
     failure list                      a pipe column plus a year or date column, nothing else
     sensor layout                     an element column and a type column with sensor types
     critical customers                an element/junction column and a type column (Hospital, ...)
@@ -61,7 +61,7 @@ def convert(paths: list[str], out_dir: str = ".", seed: int = 42) -> tuple[str, 
     one = lambda k: kinds.get(k, [None])[0]
     inp = inps[0]
     summary = [f"Model: {os.path.basename(inp)}"]
-    for k, label in (("assets", "Asset register / inspection log"), ("failures", "Failure list"),
+    for k, label in (("assets", "Asset register / assessment log"), ("failures", "Failure list"),
                      ("sensors", "Sensor layout"), ("facilities", "Critical customers")):
         if one(k):
             summary.append(f"{label}: {os.path.basename(one(k))}")
@@ -75,11 +75,11 @@ def convert(paths: list[str], out_dir: str = ".", seed: int = 42) -> tuple[str, 
     for d in res.decisions:
         acts[d.action] = acts.get(d.action, 0) + 1
     summary.append(f"Built: {wn.num_pipes} pipes, {wn.num_junctions} junctions; recommended "
-                   + ", ".join(f"{acts.get(a, 0)} {a}" for a in ("Replacement", "Rehabilitation", "Inspection", "Monitor")))
+                   + ", ".join(f"{acts.get(a, 0)} {a}" for a in ("Replacement", "Rehabilitation", "Assessment", "Monitor")))
     notes = []
     if not one("assets"):
-        notes.append("No asset register: pipe ages, materials, condition and inspections are SYNTHETIC "
-                     "(illustrative only). Upload a register or inspection log for real results.")
+        notes.append("No asset register: pipe ages, materials, condition and assessment dates are SYNTHETIC "
+                     "(illustrative only). Upload a register or assessment log for real results.")
     else:
         from .asset import load_asset_overrides
         rep: dict = {}
@@ -88,12 +88,12 @@ def convert(paths: list[str], out_dir: str = ".", seed: int = 42) -> tuple[str, 
         matched = sum(1 for p in recs if p in names)
         notes.append(f"Your file covers {matched} of {wn.num_pipes} pipes"
                      + (f"; {len(recs) - matched} rows name pipes not in the model and were skipped" if len(recs) > matched else "")
-                     + (f"; {rep['combined']} extra rows for repeated pipes were combined (latest inspection wins)" if rep["combined"] else "")
+                     + (f"; {rep['combined']} extra rows for repeated pipes were combined (latest assessment wins)" if rep["combined"] else "")
                      + ".")
         given = set(rep["columns_used"])
         missing = [label for col, label in (("install_year", "installation years"), ("material", "materials"),
                                              ("condition_grade", "condition grades"),
-                                             ("last_inspection_year", "inspection dates"))
+                                             ("last_inspection_year", "assessment dates"))
                    if col not in given]
         if missing:
             notes.append("Not in your file, so still SYNTHETIC for every pipe: " + ", ".join(missing) + ".")

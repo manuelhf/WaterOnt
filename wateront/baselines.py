@@ -26,7 +26,7 @@ from .kg import KnowledgeGraph
 from .retrieval import Evidence, VectorIndex
 
 TOPIC_ACTION = {"replacement": "Replacement", "rehabilitation": "Rehabilitation",
-                "inspection": "Inspection", "monitoring": "Monitor"}
+                "inspection": "Assessment", "monitoring": "Monitor"}
 
 
 def _features(kg: KnowledgeGraph) -> pd.DataFrame:
@@ -97,7 +97,7 @@ def asset_card(f: dict) -> str:
             f"{f['condition_grade']}. {f['failure_count']} recorded failures. Failure probability "
             f"{f['pof_band']}. Hydraulic criticality {f['hydraulic']}. Service criticality "
             f"{f['service']}. Overall risk {f['overall']}. Minimum pressure {f['min_end_pressure']} m. "
-            f"Last inspected {f['last_inspection_year']}. {fac}")
+            f"Last assessed {f['last_inspection_year']}. {fac}")
 
 
 class FlatRAGBaseline:
@@ -147,7 +147,7 @@ class FlatRAGBaseline:
 
     LLM_SYSTEM = ("You are a water-utility asset engineer. Using ONLY the asset records and policy "
                   "clauses provided, answer the question by deciding an action (Replacement, "
-                  "Rehabilitation, Inspection or Monitor) for each relevant pipe and citing the clause "
+                  "Rehabilitation, Assessment or Monitor) for each relevant pipe and citing the clause "
                   "ids that authorise it. Reply with JSON only: a list of objects with keys "
                   "pipe (the id in brackets, e.g. P:101), action, guidelines (list of clause ids).")
 

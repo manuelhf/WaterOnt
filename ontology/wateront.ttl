@@ -113,7 +113,7 @@ wno:reason a owl:DatatypeProperty ; rdfs:domain wno:OperationalStatus ; rdfs:ran
 # ASSET LAYER (Section 3.2)
 #################################################################
 wno:AssetRecord      a owl:Class .
-wno:InspectionRecord a owl:Class .
+wno:AssessmentRecord a owl:Class .
 wno:FailureEvent     a owl:Class .
 wno:Burst            a owl:Class ; rdfs:subClassOf wno:FailureEvent .
 wno:JointFailure     a owl:Class ; rdfs:subClassOf wno:FailureEvent .
@@ -123,7 +123,7 @@ wno:ThirdPartyDamage a owl:Class ; rdfs:subClassOf wno:FailureEvent .
 
 wno:hasAssetRecord a owl:ObjectProperty, owl:FunctionalProperty ; rdfs:domain wno:Link ; rdfs:range wno:AssetRecord .
 wno:experiencedFailure a owl:ObjectProperty ; rdfs:domain wno:Link ; rdfs:range wno:FailureEvent .
-wno:hasInspection a owl:ObjectProperty ; rdfs:domain wno:AssetRecord ; rdfs:range wno:InspectionRecord .
+wno:hasAssessment a owl:ObjectProperty ; rdfs:domain wno:AssetRecord ; rdfs:range wno:AssessmentRecord .
 
 wno:material         a owl:DatatypeProperty ; rdfs:domain wno:AssetRecord ; rdfs:range xsd:string .
 wno:nominalDiameter  a owl:DatatypeProperty ; rdfs:domain wno:AssetRecord ; rdfs:range xsd:float ; qudt:unit unit:MilliM .
@@ -134,7 +134,7 @@ wno:liningType       a owl:DatatypeProperty ; rdfs:domain wno:AssetRecord ; rdfs
 wno:jointType        a owl:DatatypeProperty ; rdfs:domain wno:AssetRecord ; rdfs:range xsd:string .
 wno:soilCorrosivity  a owl:DatatypeProperty ; rdfs:domain wno:AssetRecord ; rdfs:range xsd:string .
 wno:conditionGrade   a owl:DatatypeProperty ; rdfs:range xsd:integer ; rdfs:comment "UKWIR-style 1 (very good) to 5 (very poor)." .
-wno:lastInspectionYear a owl:DatatypeProperty ; rdfs:domain wno:AssetRecord ; rdfs:range xsd:integer .
+wno:lastAssessmentYear a owl:DatatypeProperty ; rdfs:domain wno:AssetRecord ; rdfs:range xsd:integer .
 wno:failureCount     a owl:DatatypeProperty ; rdfs:domain wno:AssetRecord ; rdfs:range xsd:integer .
 wno:failureMode      a owl:DatatypeProperty ; rdfs:domain wno:FailureEvent ; rdfs:range xsd:string .
 wno:year             a owl:DatatypeProperty ; rdfs:range xsd:integer .
@@ -159,17 +159,17 @@ wno:servesFacility a owl:ObjectProperty ; rdfs:domain wno:Junction ; rdfs:range 
 wno:band  a owl:DatatypeProperty ; rdfs:domain wno:RiskIndicator ; rdfs:range xsd:string .
 wno:level a owl:DatatypeProperty ; rdfs:domain wno:RiskIndicator ; rdfs:range xsd:integer .
 
-# Shared band individuals (the instance export names them FP_High, OR_Intolerable, ...)
+# Shared band individuals (the instance export names them FP_High, OR_Major, ...)
 wno:OR_Negligible  a wno:OverallRisk ; wno:band "Negligible" ; wno:level 1 .
-wno:OR_Tolerable   a wno:OverallRisk ; wno:band "Tolerable" ; wno:level 2 .
-wno:OR_Significant a wno:OverallRisk ; wno:band "Significant" ; wno:level 3 .
-wno:OR_Intolerable a wno:OverallRisk ; wno:band "Intolerable" ; wno:level 4 .
+wno:OR_Minor   a wno:OverallRisk ; wno:band "Minor" ; wno:level 2 .
+wno:OR_Moderate a wno:OverallRisk ; wno:band "Moderate" ; wno:level 3 .
+wno:OR_Major a wno:OverallRisk ; wno:band "Major" ; wno:level 4 .
 
 #################################################################
 # DECISION LAYER (Section 3.4)
 #################################################################
 wno:MaintenanceAction    a owl:Class .
-wno:Inspection     a owl:Class ; rdfs:subClassOf wno:MaintenanceAction .
+wno:Assessment     a owl:Class ; rdfs:subClassOf wno:MaintenanceAction .
 wno:Repair         a owl:Class ; rdfs:subClassOf wno:MaintenanceAction .
 wno:Rehabilitation a owl:Class ; rdfs:subClassOf wno:MaintenanceAction .
 wno:Replacement    a owl:Class ; rdfs:subClassOf wno:MaintenanceAction .

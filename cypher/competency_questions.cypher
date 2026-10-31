@@ -31,7 +31,7 @@ RETURN p.name, rp.failureProbability ORDER BY rp.priority DESC;
 // Risk: backbone pipes serving a critical service zone with intolerable risk
 MATCH (p:Pipe)-[:HAS_RISK_PROFILE]->(rp)
 MATCH (rp)-[:HAS_SERVICE_CRITICALITY]->(:ServiceCriticality {band: 'Critical'})
-MATCH (rp)-[:HAS_OVERALL_RISK]->(:OverallRisk {band: 'Intolerable'})
+MATCH (rp)-[:HAS_OVERALL_RISK]->(:OverallRisk {band: 'Major'})
 RETURN p.name;
 
 // Decision: which pipes are recommended for replacement, and which clause authorises it?

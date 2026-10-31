@@ -5,9 +5,9 @@ Replacement,replacement,3,Which assets have reached the end of their life and ne
 Rehabilitation,rehabilitation,1,Which mains are candidates for rehabilitation?,Action is Rehabilitation
 Rehabilitation,rehabilitation,2,Which deteriorated pipes should be relined rather than replaced?,Action is Rehabilitation
 Rehabilitation,rehabilitation,3,Where should we carry out structural rehabilitation this period?,Action is Rehabilitation
-Inspection,inspection,1,Which pipes need an inspection?,Action is Inspection
-Inspection,inspection,2,Which mains are overdue for a condition survey?,Action is Inspection
-Inspection,inspection,3,Where should condition assessment crews be sent next?,Action is Inspection
+Assessment,assessment,1,Which pipes need a condition assessment?,Action is Assessment
+Assessment,assessment,2,Which mains are overdue for a condition survey?,Action is Assessment
+Assessment,assessment,3,Where should condition assessment crews be sent next?,Action is Assessment
 Critical and likely to fail,critical_high_pof,1,Which hydraulically critical pipes also have a high failure probability?,Hydraulic criticality High or Critical and failure probability High or Very high
 Critical and likely to fail,critical_high_pof,2,Show backbone mains that are likely to fail.,Hydraulic criticality High or Critical and failure probability High or Very high
 Critical and likely to fail,critical_high_pof,3,Find bottleneck pipes with a high or very high probability of failure.,Hydraulic criticality High or Critical and failure probability High or Very high
@@ -17,9 +17,9 @@ Critical customers,critical_customers,3,Do any pipes feeding schools or hospital
 Material and pressure,multimodal_pressure_age_policy,1,Which cast iron mains at low service pressure need intervention?,"Cast iron, minimum pressure below 30 m, and needs intervention"
 Material and pressure,multimodal_pressure_age_policy,2,Prioritise cast iron pipes with a low pressure margin.,"Cast iron, minimum pressure below 30 m, and needs intervention"
 Material and pressure,multimodal_pressure_age_policy,3,Which old cast iron pipes with a pressure deficit require attention?,"Cast iron, minimum pressure below 30 m, and needs intervention"
-Monitoring gap,monitoring_gap,1,Which unmonitored hydraulically critical mains have intolerable risk?,"Unmonitored, hydraulic criticality High or Critical, overall risk Intolerable"
-Monitoring gap,monitoring_gap,2,Show critical pipes with intolerable risk and no pressure sensor nearby.,"Unmonitored, hydraulic criticality High or Critical, overall risk Intolerable"
-Monitoring gap,monitoring_gap,3,Where are the monitoring blind spots on high-risk backbone mains?,"Unmonitored, hydraulic criticality High or Critical, overall risk Intolerable"
+Monitoring gap,monitoring_gap,1,Which unmonitored hydraulically critical mains have major risk?,"Unmonitored, hydraulic criticality High or Critical, overall risk Major"
+Monitoring gap,monitoring_gap,2,Show critical pipes with major risk and no pressure sensor nearby.,"Unmonitored, hydraulic criticality High or Critical, overall risk Major"
+Monitoring gap,monitoring_gap,3,Where are the monitoring blind spots on high-risk backbone mains?,"Unmonitored, hydraulic criticality High or Critical, overall risk Major"
 Supply zone,zone_prv3,1,Which pipes downstream of PRV-3 need intervention?,In the zone fed by PRV-3 and needs intervention
 Supply zone,zone_prv3,2,Prioritise work in the zone supplied through PRV-3.,In the zone fed by PRV-3 and needs intervention
 Supply zone,zone_prv3,3,What maintenance is needed in the PRV-3 pressure zone?,In the zone fed by PRV-3 and needs intervention

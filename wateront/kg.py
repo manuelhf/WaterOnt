@@ -24,7 +24,7 @@ REL_TO_PROPERTY = {
     "FOLLOWS_PATTERN": "followsPattern", "HAS_CURVE": "hasCurve",
     "HAS_STATUS": "hasStatus", "GOVERNED_BY": "governedBy",
     "HAS_ASSET_RECORD": "hasAssetRecord", "EXPERIENCED_FAILURE": "experiencedFailure",
-    "HAS_INSPECTION": "hasInspection", "HAS_RISK_PROFILE": "hasRiskProfile",
+    "HAS_ASSESSMENT": "hasAssessment", "HAS_RISK_PROFILE": "hasRiskProfile",
     "HAS_FAILURE_PROBABILITY": "hasFailureProbability",
     "HAS_HYDRAULIC_CRITICALITY": "hasHydraulicCriticality",
     "HAS_SERVICE_CRITICALITY": "hasServiceCriticality",

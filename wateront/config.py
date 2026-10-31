@@ -67,9 +67,9 @@ class Config:
     pof_basis: str = "per_km"               # "per_km" or "per_segment"
     pof_bands: tuple = ((0.20, "Low"), (0.40, "Medium"), (0.52, "High"), (1.01, "VeryHigh"))
     criticality_percentiles: tuple = ((0.40, "Low"), (0.70, "Medium"), (0.90, "High"), (1.01, "Critical"))
-    # Inspection interval [years] by overall risk (utility policy stand-in)
+    # Assessment interval [years] by overall risk (utility policy stand-in)
     inspection_interval: dict = field(default_factory=lambda: {
-        "Negligible": 20, "Tolerable": 15, "Significant": 8, "Intolerable": 4,
+        "Negligible": 20, "Minor": 15, "Moderate": 8, "Major": 4,
     })
 
     # LLM (optional)

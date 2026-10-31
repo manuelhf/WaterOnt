@@ -179,7 +179,7 @@ button.rhead:focus-visible { outline: 2px solid var(--focus); outline-offset: 4p
 .why { font-size: 13px; color: var(--ink-2); }
 .act { font-size: 12px; font-weight: 600; padding: 1px 7px; border-radius: 4px; color: #fff; }
 .act.Replacement { background: var(--a-repl); } .act.Rehabilitation { background: var(--a-rehab); }
-.act.Inspection { background: var(--a-insp); } .act.Monitor { background: var(--a-mon); color: var(--ink); }
+.act.Assessment { background: var(--a-insp); } .act.Monitor { background: var(--a-mon); color: var(--ink); }
 .empty { color: var(--ink-2); font-size: 14px; border: 1px dashed var(--line); border-radius: 8px; padding: 12px; }
 
 .find { display: flex; gap: 8px; margin-bottom: 16px; }
@@ -319,11 +319,11 @@ footer.note { font-size: 12.5px; color: var(--ink-2); padding: 12px 20px; border
         <div class="grid2" id="lifeInputs"></div>
       </fieldset>
       <fieldset>
-        <legend>Inspection interval by overall risk (years)</legend>
+        <legend>Condition-review interval by overall risk (years)</legend>
         <div class="grid2" id="inspInputs"></div>
       </fieldset>
       <fieldset>
-        <label class="check"><input type="checkbox" id="r5"> Inspect critical, high-risk mains with no pressure sensor within two segments (rule R5)</label>
+        <label class="check"><input type="checkbox" id="r5"> Assess critical, high-risk mains with no pressure sensor within two segments (rule R5)</label>
       </fieldset>
       <button class="btn quiet" id="resetPolicy" type="button">Restore default policy</button>
     </section>
@@ -332,11 +332,11 @@ footer.note { font-size: 12.5px; color: var(--ink-2); padding: 12px 20px; border
       <p class="lead" id="dataSummary"></p>
       <table class="src">
         <tr><th>From the EPANET model (.inp)</th><td>Layout, lengths and diameters; simulated pressures and flows; hydraulic criticality; supply zones; sensors marked in the file; customer demand types.</td></tr>
-        <tr><th>Synthetic unless you supply them</th><td>Install year, material, condition grade, last inspection, failure history, soil, and hospitals, schools or care homes.</td></tr>
+        <tr><th>Synthetic unless you supply them</th><td>Install year, material, condition grade, last condition assessment, failure history, soil, and hospitals, schools or care homes.</td></tr>
         <tr><th>Assets assessed</th><td>Pipes only. Pumps, valves, tanks and reservoirs take part in the hydraulics and appear on the map, but receive no condition, risk or maintenance decision.</td></tr>
       </table>
       <h3>Pressure sensors</h3>
-      <p>A pipe counts as monitored when a pressure sensor sits within two links of either end. Monitoring feeds rule R5, which sends critical, high-risk mains that nobody is watching for inspection, and the questions about unmonitored mains. Add or remove sensors to see how coverage and decisions change.</p>
+      <p>A pipe counts as monitored when a pressure sensor sits within two links of either end. Monitoring feeds rule R5, which sends critical, high-risk mains that nobody is watching for condition assessment, and the questions about unmonitored mains. Add or remove sensors to see how coverage and decisions change.</p>
       <div class="btnrow">
         <button class="btn" id="placeBtn" type="button">Place sensors on the map</button>
         <button class="btn quiet" id="sensorImportBtn" type="button">Import sensor layout…</button>
@@ -371,7 +371,7 @@ footer.note { font-size: 12.5px; color: var(--ink-2); padding: 12px 20px; border
   <form method="dialog">
     <h2>Use your own EPANET model</h2>
     <ol class="steps">
-      <li><b>Choose your files.</b> Your model (.inp) and, if you have them, CSV files with your data: an asset register or inspection log, a failure list, a sensor layout, or critical customers. Column names need not match the templates exactly.<br><b>Note:</b> an EPANET model holds no asset information (pipe ages, materials, condition, inspections, failures). Whatever your files do not provide, WaterOnt fills with <b>synthetic, illustrative values</b>, so the recommendations show how the method works rather than the state of your network. You can add records later in the Data tab.</li>
+      <li><b>Choose your files.</b> Your model (.inp) and, if you have them, CSV files with your data: an asset register or condition-assessment log, a failure list, a sensor layout, or critical customers. Column names need not match the templates exactly.<br><b>Note:</b> an EPANET model holds no asset information (pipe ages, materials, condition, condition assessments, failures). Whatever your files do not provide, WaterOnt fills with <b>synthetic, illustrative values</b>, so the recommendations show how the method works rather than the state of your network. You can add records later in the Data tab.</li>
       <li><b>Copy the code and run it in Google Colab.</b> Press <i>Copy code</i>, then <i>Open Google Colab</i>, paste into the empty cell (Ctrl+V, ⌘V on a Mac) and run it (Shift+Enter). It needs a Google account and takes about a minute. Your files are inside the code and are processed only in your own Colab session.</li>
       <li><b>Open the result here.</b> Colab downloads a network file (.json): open it with <i>Open the downloaded file</i>.</li>
     </ol>
@@ -403,8 +403,8 @@ const DATA = /*__WATERONT_DATA__*/null;
 
 // LOGIC START: mirrors wateront/risk.py, decision.py and graphrag.plan_rules
 const LEVEL = { Low: 1, Medium: 2, High: 3, VeryHigh: 4, Critical: 4 };
-const ACTIONS = ["Replacement", "Rehabilitation", "Inspection", "Monitor"];
-const ACTION_RANK = { Replacement: 0, Rehabilitation: 1, Inspection: 2, Monitor: 3 };
+const ACTIONS = ["Replacement", "Rehabilitation", "Assessment", "Monitor"];
+const ACTION_RANK = { Replacement: 0, Rehabilitation: 1, Assessment: 2, Monitor: 3 };
 
 function defaultPolicy(cfg) {
   return { pofBands: cfg.pofBands.slice(), designLife: { ...cfg.designLife },
@@ -414,7 +414,7 @@ function defaultPolicy(cfg) {
 function pofBand(v, t) { return v < t[0] ? "Low" : v < t[1] ? "Medium" : v < t[2] ? "High" : "VeryHigh"; }
 function overallCategory(p, c) {
   const s = p * c;
-  return s <= 2 ? "Negligible" : s <= 4 ? "Tolerable" : s <= 8 ? "Significant" : "Intolerable";
+  return s <= 2 ? "Negligible" : s <= 4 ? "Minor" : s <= 8 ? "Moderate" : "Major";
 }
 function decide(pipe, pol) {
   const band = pofBand(pipe.pofKm, pol.pofBands);
@@ -426,17 +426,17 @@ function decide(pipe, pol) {
   const overdue = (pol.referenceYear - pipe.insp) > pol.inspectionInterval[overall];
   const extra = pipe.fac.length ? ["G-SERV-01"] : [];
   const base = { pofBand: band, pLevel: p, cLevel: c, overall, priority, life, overdue };
-  if (overall === "Intolerable" && pipe.age > life)
+  if (overall === "Major" && pipe.age > life)
     return { ...base, action: "Replacement", rule: "R1", guidelines: ["G-REPL-01", "G-RISK-01", ...extra] };
-  if ((overall === "Significant" || overall === "Intolerable") && pipe.grade >= 4)
+  if ((overall === "Moderate" || overall === "Major") && pipe.grade >= 4)
     return { ...base, action: "Rehabilitation", rule: "R2", guidelines: ["G-REHAB-01", "G-RISK-01", ...extra] };
-  if (overall === "Intolerable")
-    return { ...base, action: "Inspection", rule: "R3", guidelines: ["G-INSP-02", "G-RISK-01", ...extra] };
+  if (overall === "Major")
+    return { ...base, action: "Assessment", rule: "R3", guidelines: ["G-ASMT-02", "G-RISK-01", ...extra] };
   if (overdue)
-    return { ...base, action: "Inspection", rule: "R4", guidelines: ["G-INSP-01", ...extra] };
-  if (pol.r5 && pipe.mon === false && (overall === "Significant" || overall === "Intolerable")
+    return { ...base, action: "Assessment", rule: "R4", guidelines: ["G-ASMT-01", ...extra] };
+  if (pol.r5 && pipe.mon === false && (overall === "Moderate" || overall === "Major")
       && (pipe.hyd === "High" || pipe.hyd === "Critical"))
-    return { ...base, action: "Inspection", rule: "R5", guidelines: ["G-MON-02", ...extra] };
+    return { ...base, action: "Assessment", rule: "R5", guidelines: ["G-MON-02", ...extra] };
   return { ...base, action: "Monitor", rule: "R0", guidelines: ["G-MON-01"] };
 }
 const MATERIAL_WORDS = { "cast iron": "CI", "ductile": "DI", "asbestos": "AC", "pvc": "PVC",
@@ -450,13 +450,16 @@ function planRules(q) {
               minDia: null, maxDia: null, orderBy: null };
   if (/\b(replac\w*|renew\w*|renewal)\b/.test(s)) p.actions.push("Replacement");
   if (/\b(rehab\w*|relin\w*|refurbish\w*)\b/.test(s)) p.actions.push("Rehabilitation");
-  if (/\b(inspect\w*|survey\w*|condition assessment)\b/.test(s)) p.actions.push("Inspection");
+  if (/\b(inspect\w*|survey\w*|assess\w*)\b/.test(s.replace("risk assessment", ""))) p.actions.push("Assessment");
   if (/\b(priorit\w*|intervention|need action|urgent\w*|attention|work)\b/.test(s)) p.excludeMonitor = true;
   if (/hydraulic\w* critical|backbone|bottleneck|betweenness|trunk/.test(s)) p.bands.hyd = ["High", "Critical"];
   if (/(high|very high)\w* (failure|probability)|likely to fail|failure[- ]prone|probability of failure/.test(s))
     p.bands.pof = ["High", "VeryHigh"];
-  if (s.includes("intolerable")) p.bands.overall = ["Intolerable"];
-  else if (/\bsignificant risk/.test(s)) p.bands.overall = ["Significant", "Intolerable"];
+  // overall risk: current names, plus the earlier names (intolerable, significant, tolerable)
+  if (s.includes("intolerable") || /\bmajor risk|\brisk (is |of )?major\b/.test(s)) p.bands.overall = ["Major"];
+  else if (/\b(significant|moderate) risk/.test(s)) p.bands.overall = ["Moderate", "Major"];
+  else if (/\b(minor|tolerable) risk/.test(s)) p.bands.overall = ["Minor"];
+  else if (/\bnegligible risk/.test(s)) p.bands.overall = ["Negligible"];
   if (/(past|beyond|exceed\w*) (their |its |the )?design life|end of (their |its )?(service )?life/.test(s)) p.beyondDesignLife = true;
   if (/hospital|school|care home|critical (customer|facilit|consumer)|industrial/.test(s)) p.criticalFacilities = true;
   if (/critical service/.test(s)) p.bands.svc = ["Critical"];
@@ -564,7 +567,7 @@ function toRegisterCsv(pipes, cfg) {
     (p.reg || []).includes("dma") ? p.zone : ""])]);
 }
 // --- tolerant table reading: mirrors wateront/tables.py (the parity tests check they agree)
-const TABLE_ALIASES = {"pipe": ["pipe_id", "pipeid", "id", "asset_id", "assetid", "link", "link_id", "pipe_name", "name", "main", "main_id"], "install_year": ["installation_year", "year_installed", "installed", "install_date", "installation_date", "year_laid", "laid", "install", "date_installed", "year_of_installation"], "material": ["pipe_material", "mat", "material_type"], "condition_grade": ["condition", "grade", "condition_score", "condition_rating", "cond_grade"], "last_inspection_year": ["last_inspection", "last_inspected", "inspection_year", "inspection_date", "date_inspected", "inspected", "inspection", "date_of_inspection", "survey_date", "survey_year", "last_survey"], "soil_corrosivity": ["soil", "corrosivity", "soil_corrosion", "soil_aggressivity"], "failure_years": ["failure_year", "failure_dates", "failure_date", "burst_years", "burst_dates"], "failure_modes": ["failure_mode", "burst_modes", "burst_mode"], "lining": ["liner", "lining_type"], "joint": ["joint_type", "joints"], "dma": ["zone", "supply_zone", "district", "district_metered_area", "dma_id", "dma_name", "dma_code", "zone_id", "zone_name", "pressure_zone", "sector"], "element": ["node", "junction", "location", "sensor_location", "asset"], "type": ["sensor_type", "kind", "customer_type", "facility_type", "category"]};
+const TABLE_ALIASES = {"pipe": ["pipe_id", "pipeid", "id", "asset_id", "assetid", "link", "link_id", "pipe_name", "name", "main", "main_id"], "install_year": ["installation_year", "year_installed", "installed", "install_date", "installation_date", "year_laid", "laid", "install", "date_installed", "year_of_installation"], "material": ["pipe_material", "mat", "material_type"], "condition_grade": ["condition", "grade", "condition_score", "condition_rating", "cond_grade"], "last_inspection_year": ["last_inspection", "last_inspected", "inspection_year", "inspection_date", "date_inspected", "inspected", "inspection", "date_of_inspection", "survey_date", "survey_year", "last_survey", "last_assessment", "last_assessment_year", "assessment_date", "assessment_year", "last_assessed", "date_assessed", "condition_assessment_date", "last_condition_assessment"], "soil_corrosivity": ["soil", "corrosivity", "soil_corrosion", "soil_aggressivity"], "failure_years": ["failure_year", "failure_dates", "failure_date", "burst_years", "burst_dates"], "failure_modes": ["failure_mode", "burst_modes", "burst_mode"], "lining": ["liner", "lining_type"], "joint": ["joint_type", "joints"], "dma": ["zone", "supply_zone", "district", "district_metered_area", "dma_id", "dma_name", "dma_code", "zone_id", "zone_name", "pressure_zone", "sector"], "element": ["node", "junction", "location", "sensor_location", "asset"], "type": ["sensor_type", "kind", "customer_type", "facility_type", "category"]};
 const ALIAS_OF = Object.fromEntries(Object.entries(TABLE_ALIASES).flatMap(([c, names]) => names.map(a => [a, c])));
 const MATERIAL_NAMES = {"ci": "CI", "castiron": "CI", "greyiron": "CI", "grayiron": "CI", "spuniron": "CI", "iron": "CI", "di": "DI", "ductileiron": "DI", "ductile": "DI", "sgiron": "DI", "ac": "AC", "asbestoscement": "AC", "asbestos": "AC", "fibrecement": "AC", "fibercement": "AC", "pvc": "PVC", "upvc": "PVC", "pvcu": "PVC", "mpvc": "PVC", "pvco": "PVC", "polyvinylchloride": "PVC", "hdpe": "HDPE", "pe": "HDPE", "mdpe": "HDPE", "polyethylene": "HDPE", "polyethene": "HDPE", "pe80": "HDPE", "pe100": "HDPE", "alkathene": "HDPE", "steel": "Steel", "st": "Steel", "galvanisedsteel": "Steel", "galvanizedsteel": "Steel"};
 const SOIL_NAMES = {"low": "Low", "medium": "Medium", "med": "Medium", "moderate": "Medium", "high": "High"};
@@ -603,7 +606,7 @@ const soilOf = v => SOIL_NAMES[v.trim().toLowerCase()] || null;
 const splitList = v => v.split(/[;,|]/).map(x => x.trim()).filter(Boolean);
 function parseRegister(text, pipeIds, cfg) {
   // Same rules as asset.load_asset_overrides: blank keeps, 'none' clears failures, all-or-nothing;
-  // several rows for one pipe (an inspection log) are combined, latest inspection winning.
+  // several rows for one pipe (an assessment log) are combined, latest assessment winning.
   const { head, rows, delim } = parseTable(text);
   if (!head.length) return { errors: ["the file is empty"], edits: {}, unknown: [], info: {} };
   if (!head.includes("pipe")) return { errors: ["the first row needs a pipe column (for example “pipe” or “Pipe ID”)"], edits: {}, unknown: [], info: {} };
@@ -768,10 +771,21 @@ function applySensorLayout(D, layout) {
 }
 // LOGIC END
 
+function upgradeLabels(D) {
+  // files saved by earlier versions used Inspection / Intolerable / Significant / Tolerable
+  const txt = JSON.stringify(D);
+  if (!/"(Inspection|Intolerable|Significant|Tolerable)"|G-INSP-0/.test(txt)) return D;
+  const map = [["G-INSP-01", "G-ASMT-01"], ["G-INSP-02", "G-ASMT-02"], ["Intolerable", "Major"], ["Significant", "Moderate"],
+               ["Tolerable", "Minor"], ["Inspection", "Assessment"]];
+  let t = txt;
+  for (const [a, b] of map) t = t.replace(new RegExp(`(?<![A-Za-z])${a}(?![a-z])`, "g"), b);
+  return JSON.parse(t);
+}
 function openNetwork(D, label) {
   const need = ["network", "nodes", "pipes", "guidelines", "zones", "config"];
   const missing = need.filter(k => !(k in D));
   if (missing.length) throw new Error(`missing ${missing.join(", ")}; export the file with “python -m wateront web --json”`);
+  D = upgradeLabels(D);
   if (!D.pipes.length) throw new Error("the file contains no pipes");
   if (window.__woCtl) window.__woCtl.abort();
   main(D);
@@ -934,9 +948,9 @@ function main(D) {
   // ------------------------------------------------------------------- colouring
   const SCALES = {
     overall: { label: "Overall risk", get: (p, d) => d.overall,
-      keys: [["Negligible", "--r-neg"], ["Tolerable", "--r-tol"], ["Significant", "--r-sig"], ["Intolerable", "--r-int"]] },
+      keys: [["Negligible", "--r-neg"], ["Minor", "--r-tol"], ["Moderate", "--r-sig"], ["Major", "--r-int"]] },
     action: { label: "Recommended action", get: (p, d) => d.action,
-      keys: [["Monitor", "--a-mon"], ["Inspection", "--a-insp"], ["Rehabilitation", "--a-rehab"], ["Replacement", "--a-repl"]] },
+      keys: [["Monitor", "--a-mon"], ["Assessment", "--a-insp"], ["Rehabilitation", "--a-rehab"], ["Replacement", "--a-repl"]] },
     pof: { label: "Failure probability per km", get: (p, d) => d.pofBand,
       keys: [["Low", "--r-neg"], ["Medium", "--r-tol"], ["High", "--r-sig"], ["VeryHigh", "--r-int"]] },
     hyd: { label: "Hydraulic criticality", get: p => p.hyd,
@@ -1038,7 +1052,7 @@ function main(D) {
     const r5 = decisions.filter(d => d.rule === "R5").length;
     const anySensor = D.nodes.some(n => n[4].includes("PressureSensor"));
     $("sensorStatus").innerHTML = `<div class="msg">${pressure} pressure sensor(s); ` +
-      (anySensor ? `${mon} of ${D.pipes.length} pipes monitored; ${r5} inspection(s) from rule R5.` : `no sensor data, so every pipe is treated as monitored.`) +
+      (anySensor ? `${mon} of ${D.pipes.length} pipes monitored; ${r5} assessment(s) from rule R5.` : `no sensor data, so every pipe is treated as monitored.`) +
       (added.length || removed.length ? `<br>Changed from the original layout: ${added.length} added${added.length ? ` (${esc(added.slice(0, 6).join(", "))}${added.length > 6 ? "…" : ""})` : ""}, ` +
         `${removed.length} removed${removed.length ? ` (${esc(removed.slice(0, 6).join(", "))}${removed.length > 6 ? "…" : ""})` : ""}. ` +
         `<button class="dl" type="button" id="sensorRevert">Restore original sensors</button>` : "") + `</div>`;
@@ -1130,12 +1144,12 @@ function main(D) {
   // --------------------------------------------------------------------- explain
   function why(p, d) {
     return {
-      R1: `age ${p.age} years exceeds the ${MAT_NAMES[p.mat].toLowerCase()} design life of ${d.life} years, and overall risk is intolerable`,
+      R1: `age ${p.age} years exceeds the ${MAT_NAMES[p.mat].toLowerCase()} design life of ${d.life} years, and overall risk is major`,
       R2: `condition grade ${p.grade} with ${d.overall.toLowerCase()} overall risk`,
-      R3: `intolerable risk within design life, so condition must be confirmed before renewal`,
-      R4: `last inspected ${p.insp}, beyond the ${policy.inspectionInterval[d.overall]}-year interval for ${d.overall.toLowerCase()} risk`,
+      R3: `major risk within design life, so condition must be confirmed before renewal`,
+      R4: `last assessed ${p.insp}, beyond the ${policy.inspectionInterval[d.overall]}-year interval for ${d.overall.toLowerCase()} risk`,
       R5: `${d.overall.toLowerCase()} risk on a ${p.hyd.toLowerCase()}-criticality main with no pressure sensor within two segments`,
-      R0: `${d.overall.toLowerCase()} risk and inspection up to date`,
+      R0: `${d.overall.toLowerCase()} risk and condition assessment up to date`,
     }[d.rule];
   }
   const glChips = ids => ids.map(g => `<button class="chip" data-gl="${g}" title="${esc(glById[g].title)}">${g}</button>`).join("");
@@ -1152,7 +1166,7 @@ function main(D) {
       if (o.age !== p.age) diffs.push(`installed ${policy.referenceYear - o.age} → ${policy.referenceYear - p.age}`);
       if (o.mat !== p.mat) diffs.push(`material ${MAT_NAMES[o.mat]} → ${MAT_NAMES[p.mat]}`);
       if (o.grade !== p.grade) diffs.push(`grade ${o.grade} → ${p.grade}`);
-      if (o.insp !== p.insp) diffs.push(`last inspected ${o.insp} → ${p.insp}`);
+      if (o.insp !== p.insp) diffs.push(`last assessed ${o.insp} → ${p.insp}`);
       if (o.fails !== p.fails) diffs.push(`failures ${o.fails} → ${p.fails}`);
       if (o.soil !== p.soil) diffs.push(`soil ${o.soil} → ${p.soil}`);
       editedNote = `<div class="changed"><span class="badge">Edited</span> ${esc(diffs.join("; ") || "no net change")}. ` +
@@ -1167,7 +1181,7 @@ function main(D) {
         <label>Install year<input name="installYear" type="number" min="1800" max="${policy.referenceYear}" value="${policy.referenceYear - p.age}" required></label>
         <label>Material<select name="mat">${Object.keys(D.config.weibull).map(m => `<option value="${m}"${m === p.mat ? " selected" : ""}>${MAT_NAMES[m] || m}</option>`).join("")}</select></label>
         <label>Condition grade<select name="grade">${[1, 2, 3, 4, 5].map(g => `<option${g === p.grade ? " selected" : ""}>${g}</option>`).join("")}</select></label>
-        <label>Last inspected<input name="insp" type="number" min="1800" max="${policy.referenceYear}" value="${p.insp}" required></label>
+        <label>Last assessed<input name="insp" type="number" min="1800" max="${policy.referenceYear}" value="${p.insp}" required></label>
         <label>Soil corrosivity<select name="soil">${Object.keys(D.config.soilFactor).map(x => `<option${x === p.soil ? " selected" : ""}>${x}</option>`).join("")}</select></label>
         <label class="wide">Failure years, separated by “;”<input name="failYears" type="text" value="${p.failYears.join("; ")}" placeholder="none"></label>
         <span class="hint wide">Hydraulic and service criticality come from the network model and are not affected by these facts.</span>
@@ -1184,7 +1198,7 @@ function main(D) {
           <dl class="facts"><dt>Material</dt><dd>${MAT_NAMES[p.mat]} <span style="color:var(--ink-2)">(${esc(p.msrc)})</span></dd>
           <dt>Installed</dt><dd>${policy.referenceYear - p.age}, age ${p.age} years${lifeFlag}</dd>
           <dt>Design life</dt><dd>${d.life} years</dd><dt>Condition grade</dt><dd>${p.grade} of 5</dd>
-          <dt>Failures</dt><dd>${p.fails} recorded</dd><dt>Last inspected</dt><dd>${p.insp}${d.overdue ? ` <span class="flag">overdue</span>` : ""}</dd></dl></li>
+          <dt>Failures</dt><dd>${p.fails} recorded</dd><dt>Last assessed</dt><dd>${p.insp}${d.overdue ? ` <span class="flag">overdue</span>` : ""}</dd></dl></li>
         <li><span class="rel">has risk profile</span><br><span class="node">Risk profile</span>
           <dl class="facts"><dt>Failure probability</dt><dd>${(p.pofKm * 100).toFixed(0)}% per km over 10 years (${d.pofBand === "VeryHigh" ? "very high" : d.pofBand.toLowerCase()}); ${(p.pof * 100).toFixed(1)}% for this segment</dd>
           <dt>Hydraulic criticality</dt><dd>${p.hyd}</dd>
@@ -1210,7 +1224,7 @@ function main(D) {
       const raw = String(f.get("failYears")).trim();
       const ys = /^(none|0)?$/i.test(raw) ? [] : raw.split(";").map(x => x.trim()).filter(Boolean).map(Number);
       const err = !Number.isInteger(yr) || yr < 1800 || yr > policy.referenceYear ? "Install year must be a year up to " + policy.referenceYear + "."
-        : insp < yr ? "Last inspection cannot be before installation."
+        : insp < yr ? "Last assessment cannot be before installation."
         : ys.some(y => !Number.isInteger(y) || y < yr || y > policy.referenceYear) ? `Failure years must be whole years between ${yr} and ${policy.referenceYear}.` : "";
       if (err) { $("editErr").textContent = err; return; }
       editPipe(i, { installYear: yr, mat: f.get("mat"), grade: +f.get("grade"), insp, soil: f.get("soil"), failYears: ys });
@@ -1230,13 +1244,13 @@ function main(D) {
   }
   function updateDataNote() {
     const LABEL = { install_year: "installation years", material: "materials", condition_grade: "condition grades",
-                    last_inspection_year: "inspection dates", failure_years: "failure records", soil_corrosivity: "soil", dma: "DMAs" };
+                    last_inspection_year: "assessment dates", failure_years: "failure records", soil_corrosivity: "soil", dma: "DMAs" };
     const n = D.pipes.length, and = xs => xs.length > 1 ? `${xs.slice(0, -1).join(", ")} and ${xs[xs.length - 1]}` : xs[0];
     const count = Object.fromEntries(Object.keys(LABEL).map(k => [k, D.pipes.filter(p => providedOf(p).includes(k)).length]));
     const core = ["install_year", "material", "condition_grade", "last_inspection_year"];
     let text;
     if (Object.values(count).every(c => !c))
-      text = `Asset data (pipe ages, materials, condition, inspections, failures) are synthetic for all ${n.toLocaleString()} pipes, so the recommendations are illustrative.`;
+      text = `Asset data (pipe ages, materials, condition, assessments, failures) are synthetic for all ${n.toLocaleString()} pipes, so the recommendations are illustrative.`;
     else if (core.every(k => count[k] === n))
       text = `Asset data come from your files for all ${n.toLocaleString()} pipes.`;
     else {
@@ -1262,7 +1276,7 @@ function main(D) {
       "## Pipe", `- Length ${p.len} m, diameter ${p.dia} mm, zone fed by ${p.zone || "none"}`, "",
       "## Asset record" + (isEdited(p.id) ? " (edited in the explorer)" : ""),
       `- Material: ${MAT_NAMES[p.mat]} (${p.msrc})`, `- Installed ${policy.referenceYear - p.age}, age ${p.age} years; design life ${d.life} years`,
-      `- Condition grade ${p.grade} of 5; failures: ${p.failYears.join(", ") || "none"}; last inspected ${p.insp}${d.overdue ? " (overdue)" : ""}`, "",
+      `- Condition grade ${p.grade} of 5; failures: ${p.failYears.join(", ") || "none"}; last assessed ${p.insp}${d.overdue ? " (overdue)" : ""}`, "",
       "## Risk profile", `- Failure probability ${(p.pofKm * 100).toFixed(1)}% per km over ${D.config.horizon} years (${d.pofBand})`,
       `- Hydraulic criticality ${p.hyd}; service criticality ${p.svc}${p.fac.length ? ` (serves ${p.fac.join(", ")})` : ""}`,
       `- Pressure monitoring: ${p.mon === false ? "no sensor within two segments" : "sensor within two segments"}`,
@@ -1270,7 +1284,7 @@ function main(D) {
       "## Authorising clauses", ...d.guidelines.map(g => `- **${g}** ${glById[g].title} (${glById[g].framework}): ${glById[g].text}`), "",
       "## Policy in force", `- PoF band limits per km: ${policy.pofBands.join(", ")}`,
       `- Design life: ${Object.entries(policy.designLife).map(([m, v]) => `${m} ${v}`).join(", ")}`,
-      `- Inspection intervals: ${Object.entries(policy.inspectionInterval).map(([r, v]) => `${r} ${v}`).join(", ")}; rule R5 ${policy.r5 ? "on" : "off"}`, "",
+      `- Condition-review intervals: ${Object.entries(policy.inspectionInterval).map(([r, v]) => `${r} ${v}`).join(", ")}; rule R5 ${policy.r5 ? "on" : "off"}`, "",
       `_${D.notice || ""} Generated by the WaterOnt explorer on ${new Date().toISOString().slice(0, 10)}._`];
     return lines.join("\n") + "\n";
   }
@@ -1284,7 +1298,7 @@ function main(D) {
   // ------------------------------------------------------------------------- ask
   const EXAMPLES = [
     "Which pipes should be replaced?",
-    "Which unmonitored hydraulically critical mains have intolerable risk?",
+    "Which unmonitored hydraulically critical mains have major risk?",
     "Which pipes downstream of PRV-3 need intervention?",
     "Which mains in the tank zone should be replaced? top 5",
     "Which pipes at low pressure need intervention?",
@@ -1322,7 +1336,7 @@ function main(D) {
     const pl = planRules(q), parts = describePlan(pl);
     if (!parts.length && !pl.orderBy) {           // nothing understood: say so, list nothing
       highlight = new Set(); paint();
-      $("answer").innerHTML = `<div class="understood">This question was not understood, so no pipes are listed. The explorer understands actions (replace, rehabilitate, inspect), risks (intolerable, likely to fail, hydraulically critical), zones (PRV-3, tank zone), gaps (unmonitored, low pressure), materials, installation dates, failures and diameters (above 150 mm, smallest diameters). For other questions, ask Claude.</div>
+      $("answer").innerHTML = `<div class="understood">This question was not understood, so no pipes are listed. The explorer understands actions (replace, rehabilitate, assess), risks (major risk, likely to fail, hydraulically critical), zones (PRV-3, tank zone), gaps (unmonitored, low pressure), materials, installation dates, failures and diameters (above 150 mm, smallest diameters). For other questions, ask Claude.</div>
         <div class="btnrow" style="margin-top:10px"><button class="btn quiet" type="button" id="claudeResBtn">Ask Claude about this question</button></div>`;
       $("claudeResBtn").onclick = () => openClaude("Claude will receive your question and the network summary.", resultsEvidence(q, parts, [], 0), q);
       $("examples").hidden = true; $("moreEx").hidden = false;
@@ -1369,7 +1383,7 @@ function main(D) {
   });
 
   // ---------------------------------------------------------------------- policy
-  const lifeKeys = Object.keys(policy.designLife), riskKeys = ["Negligible", "Tolerable", "Significant", "Intolerable"];
+  const lifeKeys = Object.keys(policy.designLife), riskKeys = ["Negligible", "Minor", "Moderate", "Major"];
   $("lifeInputs").innerHTML = lifeKeys.map(m => `<label>${MAT_NAMES[m] || m}<input type="number" min="10" max="200" step="5" data-life="${m}"></label>`).join("");
   $("inspInputs").innerHTML = riskKeys.map(r => `<label>${r}<input type="number" min="1" max="50" step="1" data-insp="${r}"></label>`).join("");
   function syncInputs() {
@@ -1413,8 +1427,8 @@ function main(D) {
   function policyText() {
     return [`- Failure-probability band limits per km: ${policy.pofBands.join(", ")}`,
       `- Design life (years): ${Object.entries(policy.designLife).map(([m, v]) => `${MAT_NAMES[m] || m} ${v}`).join(", ")}`,
-      `- Inspection interval (years): ${Object.entries(policy.inspectionInterval).map(([r, v]) => `${r} ${v}`).join(", ")}`,
-      `- Rule R5 (inspect unmonitored critical high-risk mains): ${policy.r5 ? "on" : "off"}`].join("\n");
+      `- Assessment interval (years): ${Object.entries(policy.inspectionInterval).map(([r, v]) => `${r} ${v}`).join(", ")}`,
+      `- Rule R5 (assess unmonitored critical high-risk mains): ${policy.r5 ? "on" : "off"}`].join("\n");
   }
   function claudePrompt(question, evidence) {
     return `I am using the WaterOnt explorer, a knowledge-graph decision-support tool for water distribution networks. ` +
@@ -1423,10 +1437,10 @@ function main(D) {
       `If the evidence cannot answer the question, say so and say what data would be needed. ` +
       `Asset records in this network are synthetic demonstration data, and the clauses are paraphrased stand-ins for real standards.\n\n` +
       `QUESTION: ${question}\n\n--- EVIDENCE (${D.network}) ---\n${evidence}\n\n--- POLICY IN FORCE ---\n${policyText()}\n\n` +
-      `--- HOW THE RULES WORK ---\nR1 Replacement: overall risk Intolerable and age beyond design life. R2 Rehabilitation: risk Significant or Intolerable and condition grade 4 or 5. ` +
-      `R3 Inspection: Intolerable risk within design life. R4 Inspection: inspection interval for the risk category exceeded. ` +
-      `R5 Inspection: Significant or Intolerable risk, High or Critical hydraulic criticality, and no pressure sensor within two links. R0 Monitor: otherwise. ` +
-      `Overall risk = likelihood band × consequence band (the higher of hydraulic and service criticality), each 1 to 4: up to 2 Negligible, up to 4 Tolerable, up to 8 Significant, above 8 Intolerable.\n`;
+      `--- HOW THE RULES WORK ---\nR1 Replacement: overall risk Major and age beyond design life. R2 Rehabilitation: risk Moderate or Major and condition grade 4 or 5. ` +
+      `R3 Assessment: Major risk within design life. R4 Assessment: condition-assessment interval for the risk category exceeded. ` +
+      `R5 Assessment: Moderate or Major risk, High or Critical hydraulic criticality, and no pressure sensor within two links. R0 Monitor: otherwise. ` +
+      `Overall risk = likelihood band × consequence band (the higher of hydraulic and service criticality), each 1 to 4: up to 2 Negligible, up to 4 Minor, up to 8 Moderate, above 8 Major.\n`;
   }
   let claudeEvidence = "";
   function openClaude(what, evidence, question) {
@@ -1473,7 +1487,7 @@ function main(D) {
   const stamp = () => new Date().toISOString().slice(0, 10);
   function decisionsCsv() {
     return toCsv([["pipe", "zone", "length_m", "diameter_mm", "material", "material_source", "install_year", "age", "design_life",
-      "condition_grade", "failures", "last_inspection", "pof_per_km", "pof_band", "hydraulic_criticality", "service_criticality",
+      "condition_grade", "failures", "last_assessment", "pof_per_km", "pof_band", "hydraulic_criticality", "service_criticality",
       "critical_customers", "pressure_sensor_nearby", "min_pressure_m", "overall_risk", "action", "rule", "reason", "clauses",
       "action_under_default_policy", "edited"],
       ...D.pipes.map((p, i) => { const d = decisions[i]; return [p.id, p.zone || "", p.len, p.dia, p.mat, p.msrc,
@@ -1554,7 +1568,7 @@ function main(D) {
     afterEdit();
     const inf = res.info || {};
     $("importStatus").innerHTML = `<div class="msg">Updated ${n} pipe(s) from ${esc(file.name)} (${esc(inf.separator || "comma")}-separated).` +
-      (inf.combined ? ` Combined ${inf.combined} extra row(s) for pipes listed more than once: the latest inspection wins.` : "") +
+      (inf.combined ? ` Combined ${inf.combined} extra row(s) for pipes listed more than once: the latest assessment wins.` : "") +
       (res.unknown.length ? ` Skipped ${res.unknown.length} pipe(s) not in ${esc(D.network)}, e.g. ${res.unknown.slice(0, 3).map(esc).join(", ")}.` : "") +
       (inf.ignored && inf.ignored.length ? ` Columns not used: ${inf.ignored.map(esc).join(", ")}.` : "") + `</div>`;
   };

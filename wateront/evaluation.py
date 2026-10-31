@@ -50,8 +50,8 @@ INTENTS = [
         "Which mains are candidates for rehabilitation?",
         "Which deteriorated pipes should be relined rather than replaced?",
         "Where should we carry out structural rehabilitation this period?"]),
-    Intent("inspection", lambda f, d, c: d.action == "Inspection", [
-        "Which pipes need an inspection?",
+    Intent("assessment", lambda f, d, c: d.action == "Assessment", [
+        "Which pipes need a condition assessment?",
         "Which mains are overdue for a condition survey?",
         "Where should condition assessment crews be sent next?"]),
     Intent("critical_high_pof", lambda f, d, c: f["hydraulic"] in ("High", "Critical")
@@ -75,9 +75,9 @@ INTENTS = [
 # Intents that need sensor metadata / multiple supply zones (L-TOWN style models)
 INSTRUMENTED_INTENTS = [
     Intent("monitoring_gap", lambda f, d, c: f.get("monitored") is False
-           and f["hydraulic"] in ("High", "Critical") and f["overall"] == "Intolerable", [
-        "Which unmonitored hydraulically critical mains have intolerable risk?",
-        "Show critical pipes with intolerable risk and no pressure sensor nearby.",
+           and f["hydraulic"] in ("High", "Critical") and f["overall"] == "Major", [
+        "Which unmonitored hydraulically critical mains have major risk?",
+        "Show critical pipes with major risk and no pressure sensor nearby.",
         "Where are the monitoring blind spots on high-risk backbone mains?"]),
     Intent("zone_prv3", lambda f, d, c: f.get("zone") == "PRV-3" and d.action != "Monitor", [
         "Which pipes downstream of PRV-3 need intervention?",

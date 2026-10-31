@@ -1,7 +1,7 @@
 """Risk Layer (Section 3.3).
 
 Each pipe gets a RiskProfile linked to *shared* band nodes, e.g.
-    (:Pipe)-[:HAS_RISK_PROFILE]->(:RiskProfile)-[:HAS_OVERALL_RISK]->(:OverallRisk {band:'Intolerable'})
+    (:Pipe)-[:HAS_RISK_PROFILE]->(:RiskProfile)-[:HAS_OVERALL_RISK]->(:OverallRisk {band:'Major'})
 so "hydraulically critical AND high PoF" is a two-hop pattern intersection rather
 than a numeric filter evaluated by the language model.
 
@@ -30,7 +30,7 @@ from .physical import link_uid, node_uid, total_demand
 
 LEVEL = {"Low": 1, "Medium": 2, "High": 3, "VeryHigh": 4, "Critical": 4}
 CRIT_BANDS = ["Low", "Medium", "High", "Critical"]
-OVERALL = ["Negligible", "Tolerable", "Significant", "Intolerable"]
+OVERALL = ["Negligible", "Minor", "Moderate", "Major"]
 
 
 def overall_category(pof_level: int, consequence_level: int) -> str:
@@ -38,10 +38,10 @@ def overall_category(pof_level: int, consequence_level: int) -> str:
     if score <= 2:
         return "Negligible"
     if score <= 4:
-        return "Tolerable"
+        return "Minor"
     if score <= 8:
-        return "Significant"
-    return "Intolerable"
+        return "Moderate"
+    return "Major"
 
 
 def _band(value: float, bands) -> str:

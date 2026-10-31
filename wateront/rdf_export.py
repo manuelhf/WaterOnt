@@ -57,7 +57,7 @@ COMPETENCY_QUESTIONS = {
     "CQ-Asset": """SELECT ?p ?y ?n WHERE {{ ?p wno:hasAssetRecord ?a . ?a wno:material "CI" ;
                    wno:installationYear ?y ; wno:failureCount ?n . FILTER(?y < 1970 && ?n > 2) }}""",
     "CQ-Risk": """SELECT ?p WHERE {{ ?p wno:hasRiskProfile ?rp . ?rp wno:hasHydraulicCriticality wno:HC_Critical ;
-                  wno:hasServiceCriticality wno:SC_Critical ; wno:hasOverallRisk wno:OR_Intolerable }}""",
+                  wno:hasServiceCriticality wno:SC_Critical ; wno:hasOverallRisk wno:OR_Major }}""",
     "CQ-Decision": """SELECT ?p ?g WHERE {{ ?d wno:concerns ?p ; wno:recommends wno:MA_Replacement ;
                       wno:supportedBy ?g }}""",
 }

@@ -17,47 +17,47 @@ from dataclasses import dataclass, field
 from .config import Config
 from .kg import KnowledgeGraph
 
-ACTIONS = ["Replacement", "Rehabilitation", "Inspection", "Monitor"]
+ACTIONS = ["Replacement", "Rehabilitation", "Assessment", "Monitor"]
 ACTION_RANK = {a: i for i, a in enumerate(ACTIONS)}
 
 GUIDELINES = [
     dict(id="G-REPL-01", framework="AWWA M28", topic="replacement",
-         title="Replacement at end of design life under intolerable risk",
+         title="Replacement at end of design life under major risk",
          text="Mains whose service age exceeds the material-specific design life and whose overall "
-              "risk is classified intolerable shall be programmed for replacement; renewal by "
+              "risk is classified major shall be programmed for replacement; renewal by "
               "rehabilitation is not appropriate once the structural design life is exhausted."),
     dict(id="G-RISK-01", framework="ISO 55000", topic="risk",
          title="Likelihood-consequence risk matrix",
          text="Asset intervention priority is set by combining the likelihood of failure with the "
-              "consequence of failure in a four-band risk matrix: negligible, tolerable, significant "
-              "and intolerable. Intolerable risks require action in the current planning period."),
+              "consequence of failure in a four-band risk matrix: negligible, minor, moderate "
+              "and major. Major risks require action in the current planning period."),
     dict(id="G-REHAB-01", framework="UKWIR", topic="rehabilitation",
          title="Rehabilitation of deteriorated mains",
          text="Where condition assessment grades a main as poor or very poor (grade 4 or 5) and the "
-              "overall risk is significant or intolerable, structural or semi-structural "
+              "overall risk is moderate or major, structural or semi-structural "
               "rehabilitation such as relining should be considered before replacement."),
-    dict(id="G-INSP-01", framework="Utility policy", topic="inspection",
-         title="Risk-based inspection intervals",
-         text="Each main shall be inspected at an interval set by its overall risk category: 4 years "
-              "for intolerable, 8 years for significant, 15 years for tolerable and 20 years for "
-              "negligible risk. An exceeded interval triggers a scheduled inspection."),
-    dict(id="G-INSP-02", framework="UKWIR", topic="inspection",
+    dict(id="G-ASMT-01", framework="Utility policy", topic="assessment",
+         title="Risk-based condition-assessment intervals",
+         text="Each main shall receive a condition assessment at an interval set by its overall risk "
+              "category: 4 years for major, 8 years for moderate, 15 years for minor and 20 years for "
+              "negligible risk. An exceeded interval triggers a scheduled condition assessment."),
+    dict(id="G-ASMT-02", framework="UKWIR", topic="assessment",
          title="Condition assessment before committing to renewal",
-         text="Mains with intolerable risk that remain within design life and are not yet graded "
+         text="Mains with major risk that remain within design life and are not yet graded "
               "poor shall receive an urgent condition assessment to confirm the renewal option."),
     dict(id="G-SERV-01", framework="ISO 24510", topic="service",
          title="Critical customers and supply continuity",
          text="Mains supplying hospitals, schools and care homes carry elevated consequence of failure; "
               "interventions on these mains require supply continuity planning and customer notification."),
     dict(id="G-MON-01", framework="Utility policy", topic="monitoring",
-         title="Continued monitoring of low-risk mains",
-         text="Mains with negligible or tolerable risk and no exceeded inspection interval remain in "
+         title="Continued routine monitoring",
+         text="Mains for which no renewal, rehabilitation or condition assessment is required remain in "
               "routine monitoring through burst records and network telemetry."),
-    dict(id="G-MON-02", framework="Utility policy", topic="inspection",
+    dict(id="G-MON-02", framework="Utility policy", topic="monitoring",
          title="Monitoring coverage of critical mains",
-         text="Hydraulically critical mains of significant or intolerable risk that are not observed "
-              "by any pressure sensor within two pipe segments shall be inspected and assessed for "
-              "additional pressure monitoring, since failures there may go undetected."),
+         text="Hydraulically critical mains of moderate or major risk that are not observed "
+              "by any pressure sensor within two pipe segments shall receive a condition assessment and "
+              "be assessed for additional pressure monitoring, since failures there may go undetected."),
     # Distractors: relevant to water networks, not to pipe renewal decisions
     dict(id="G-VALV-01", framework="AWWA", topic="valves",
          title="Valve exercising programme",
@@ -97,17 +97,17 @@ def apply_policy(f: dict, cfg: Config) -> Decision:
     risk, age, life, grade = f["overall"], f["age"], f["design_life"], f["condition_grade"]
     overdue = (cfg.reference_year - f["last_inspection_year"]) > cfg.inspection_interval[risk]
     extra = ["G-SERV-01"] if f.get("facilities") else []
-    if risk == "Intolerable" and age > life:
+    if risk == "Major" and age > life:
         return Decision(f["pipe"], "Replacement", ["G-REPL-01", "G-RISK-01", *extra], "R1", f)
-    if risk in ("Significant", "Intolerable") and grade >= 4:
+    if risk in ("Moderate", "Major") and grade >= 4:
         return Decision(f["pipe"], "Rehabilitation", ["G-REHAB-01", "G-RISK-01", *extra], "R2", f)
-    if risk == "Intolerable":
-        return Decision(f["pipe"], "Inspection", ["G-INSP-02", "G-RISK-01", *extra], "R3", f)
+    if risk == "Major":
+        return Decision(f["pipe"], "Assessment", ["G-ASMT-02", "G-RISK-01", *extra], "R3", f)
     if overdue:
-        return Decision(f["pipe"], "Inspection", ["G-INSP-01", *extra], "R4", f)
-    if (f.get("monitored") is False and risk in ("Significant", "Intolerable")
+        return Decision(f["pipe"], "Assessment", ["G-ASMT-01", *extra], "R4", f)
+    if (f.get("monitored") is False and risk in ("Moderate", "Major")
             and f["hydraulic"] in ("High", "Critical")):
-        return Decision(f["pipe"], "Inspection", ["G-MON-02", *extra], "R5", f)
+        return Decision(f["pipe"], "Assessment", ["G-MON-02", *extra], "R5", f)
     return Decision(f["pipe"], "Monitor", ["G-MON-01"], "R0", f)
 
 
@@ -127,7 +127,7 @@ def pipe_facts(kg: KnowledgeGraph, pipe_uid: str) -> dict:
                 monitored=(kg.node(ms)["band"] == "Monitored") if ms else None,
                 zone=kg.node(zone)["name"] if zone else None,
                 age=ar["age"], design_life=ar["designLife"], condition_grade=ar["conditionGrade"],
-                last_inspection_year=ar["lastInspectionYear"], failure_count=ar["failureCount"],
+                last_inspection_year=ar["lastAssessmentYear"], failure_count=ar["failureCount"],
                 pof=rp["failureProbability"], pof_km=rp.get("failureProbabilityPerKm", rp["failureProbability"]),
                 likelihood_source=rp.get("likelihoodSource", "weibull"),
                 pof_band=band("HAS_FAILURE_PROBABILITY"),

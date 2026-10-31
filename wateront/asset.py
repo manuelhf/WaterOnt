@@ -296,7 +296,7 @@ def build_asset_layer(wn: wntr.network.WaterNetworkModel, kg: KnowledgeGraph,
                           liningType=r.lining, jointType=r.joint,
                           soilCorrosivity=r.soil_corrosivity,
                           conditionGrade=int(r.condition_grade),
-                          lastInspectionYear=int(r.last_inspection_year),
+                          lastAssessmentYear=int(r.last_inspection_year),
                           failureCount=len(r.failure_years), recordVersion=1,
                           materialSource=getattr(r, "material_source", "prior"),
                           providedFields=",".join(getattr(r, "provided", None) or []))
@@ -304,9 +304,9 @@ def build_asset_layer(wn: wntr.network.WaterNetworkModel, kg: KnowledgeGraph,
         for k, (yr, mode) in enumerate(zip(r.failure_years, r.failure_modes)):
             fid = kg.add_node(f"FE:{r.pipe}:{k}", "FailureEvent", mode, year=int(yr), failureMode=mode)
             kg.add_edge(pid, "EXPERIENCED_FAILURE", fid)
-        iid = kg.add_node(f"IR:{r.pipe}", "InspectionRecord",
+        iid = kg.add_node(f"CA:{r.pipe}", "AssessmentRecord",
                           year=int(r.last_inspection_year), conditionGrade=int(r.condition_grade))
-        kg.add_edge(aid, "HAS_INSPECTION", iid)
+        kg.add_edge(aid, "HAS_ASSESSMENT", iid)
 
 
 def simulate_future_failures(assets: pd.DataFrame, wn: wntr.network.WaterNetworkModel,

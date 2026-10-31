@@ -19,10 +19,10 @@ import matplotlib.pyplot as plt  # noqa: E402
 from .graphrag import GraphRAG  # noqa: E402
 from .pipeline import BuildResult  # noqa: E402
 
-ACTION_COLOR = {"Replacement": "#A8231C", "Rehabilitation": "#7A4FB5", "Inspection": "#2F6FB0", "Monitor": "#A3AFB3"}
+ACTION_COLOR = {"Replacement": "#A8231C", "Rehabilitation": "#7A4FB5", "Assessment": "#2F6FB0", "Monitor": "#A3AFB3"}
 EXAMPLES = [
     "Which pipes should be replaced?",
-    "Which unmonitored hydraulically critical mains have intolerable risk?",
+    "Which unmonitored hydraulically critical mains have major risk?",
     "Which pipes downstream of PRV-3 need intervention?",
     "Which mains in the tank zone should be replaced? top 5",
     "Which cast iron pipes are past their design life?",

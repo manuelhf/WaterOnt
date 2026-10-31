@@ -55,8 +55,8 @@ def plan_rules(q: str) -> QueryPlan:
         p.actions.append("Replacement")
     if re.search(r"\b(rehab\w*|relin\w*|refurbish\w*)\b", s):
         p.actions.append("Rehabilitation")
-    if re.search(r"\b(inspect\w*|survey\w*|condition assessment)\b", s):
-        p.actions.append("Inspection")
+    if re.search(r"\b(inspect\w*|survey\w*|assess\w*)\b", s.replace("risk assessment", "")):
+        p.actions.append("Assessment")
     if re.search(r"\b(priorit\w*|intervention|need action|urgent\w*|attention|work)\b", s):
         p.exclude_monitor = True
     if re.search(r"hydraulic\w* critical|backbone|bottleneck|betweenness|trunk", s):
@@ -64,10 +64,15 @@ def plan_rules(q: str) -> QueryPlan:
     if re.search(r"(high|very high)\w* (failure|probability)|likely to fail|failure[- ]prone|"
                  r"probability of failure", s):
         p.bands["pof"] = ["High", "VeryHigh"]
-    if "intolerable" in s:
-        p.bands["overall"] = ["Intolerable"]
-    elif re.search(r"\bsignificant risk", s):
-        p.bands["overall"] = ["Significant", "Intolerable"]
+    # overall risk: current names, plus the earlier names (intolerable, significant, tolerable)
+    if "intolerable" in s or re.search(r"\bmajor risk|\brisk (is |of )?major\b", s):
+        p.bands["overall"] = ["Major"]
+    elif re.search(r"\b(significant|moderate) risk", s):
+        p.bands["overall"] = ["Moderate", "Major"]
+    elif re.search(r"\b(minor|tolerable) risk", s):
+        p.bands["overall"] = ["Minor"]
+    elif re.search(r"\bnegligible risk", s):
+        p.bands["overall"] = ["Negligible"]
     if re.search(r"(past|beyond|exceed\w*) (their |its |the )?design life|end of (their |its )?(service )?life", s):
         p.beyond_design_life = True
     if re.search(r"hospital|school|care home|critical (customer|facilit|consumer)|industrial", s):
@@ -118,11 +123,13 @@ def diameter_terms(s: str) -> tuple[float | None, float | None, str | None]:
 
 PLANNER_PROMPT = """Convert the engineer's question into a JSON query plan for a water-network
 knowledge graph. Reply with JSON only, no prose and no code fences. Keys:
-actions: subset of ["Replacement","Rehabilitation","Inspection","Monitor"] ([] = any)
+actions: subset of ["Replacement","Rehabilitation","Assessment","Monitor"] ([] = any)
 exclude_monitor: bool (true when the user asks what needs intervention/prioritisation)
 bands: object, keys among pof|hydraulic|service|overall; values are lists from
   pof: Low, Medium, High, VeryHigh; hydraulic/service: Low, Medium, High, Critical;
-  overall: Negligible, Tolerable, Significant, Intolerable
+  overall: Negligible, Minor, Moderate, Major
+  (earlier names: Intolerable = Major, Significant = Moderate, Tolerable = Minor;
+   "inspection" in a question means the action Assessment)
 material: subset of ["CI","DI","AC","PVC","HDPE","Steel"]
 installed_before: int or null; min_failures: int or null; beyond_design_life: bool
 critical_facilities: bool; low_pressure: bool; unmonitored: bool
@@ -322,10 +329,10 @@ class GraphRAG:
                       f"and overall risk is {f['overall']}",
                 "R2": f"condition grade {f['condition_grade']} with {f['overall']} overall risk",
                 "R3": f"{f['overall']} risk within design life; condition must be confirmed",
-                "R4": "the risk-based inspection interval is exceeded",
+                "R4": "the risk-based condition-assessment interval is exceeded",
                 "R5": f"{f['overall']} risk on a {f['hydraulic']}-criticality main with no pressure "
                       f"sensor within two segments",
-                "R0": f"{f['overall']} risk and inspection up to date",
+                "R0": f"{f['overall']} risk and condition assessment up to date",
             }[e.rule]
             fac = f"; serves {', '.join(f['facilities'])}" if f["facilities"] else ""
             if f.get("zone"):
