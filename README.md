@@ -132,15 +132,6 @@ Then `python -m wateront web --inp mynet.inp --assets register.csv --json --out 
 
 **Live app on Colab** (`demo/WaterOnt_Colab.ipynb`). Builds the graph, downloads the static page, and launches `wateront/gradio_app.py` with `share=True`, which gives a temporary public link to the real Python engine. Add `ANTHROPIC_API_KEY` in Colab Secrets to switch on Claude for planning and generation.
 
-## Working with synthetic data
-
-The network, hydraulics, sensors and demand categories are real model data; only asset histories are synthetic. To make results defensible:
-
-- **Report across many synthetic utilities.** `python -m wateront evaluate --inp <net> --seeds 10` draws 10 independent asset histories on the same network and reports mean and sd. On L-TOWN, GraphRAG decision F1 is 0.927 ± 0.006, flat RAG 0.013 ± 0.005 and ML 0.041 ± 0.017, so the conclusions do not depend on one draw.
-- **Document the generator as a method.** Every prior is in `config.py`, every attribute records its provenance (`materialSource`), and the generator is seeded and versioned.
-- **Validate against the one observed signal available.** That is the BattLeDIM leak records (`--holdout-failures`).
-- **Use synthetic data for what it is good at.** It suits testing whether the pipeline retrieves, reasons and cites correctly. It does not show real-world decision quality, and the paper should say so.
-
 ## Read before reporting these numbers
 
 The reference decisions are produced by applying the same encoded policy to the same recorded asset data, so Decision F1 measures faithful, query-correct application of policy, not real-world decision quality. To claim the latter, supply expert-labelled decisions with `evaluate --expert refs.csv` (columns `intent,pipe,action,guidelines`, guidelines `;`-separated).
