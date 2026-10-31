@@ -8,7 +8,7 @@
 
 Reference implementation for *Explainable Asset Management in Water Networks using GraphRAG and Engineering Knowledge Graphs*, Herrera et al. (in preparation).
 
-It builds the four-layer WaterOnt knowledge graph from any EPANET `.inp` file, answers engineering questions through a GraphRAG engine whose every recommendation carries a verifiable path back to asset evidence and the authorising policy clause, and compares it against an ML failure-prediction baseline and a flat-document RAG baseline.
+It builds the four-layer WaterOnt knowledge graph from any EPANET `.inp` file, answers engineering questions through a GraphRAG engine whose every recommendation carries a verifiable path back to asset evidence and the authorising policy clause, and compares it with a tabular baseline applying the same rules and with flat-text RAG using lexical and dense-vector retrieval.
 
 ## Use your own network (no Python needed)
 
@@ -29,15 +29,14 @@ Files do not have to follow the templates in [`data/`](data/) exactly: column na
 
 | Paper | Module | What it does |
 |---|---|---|
-| §3.1 Physical Layer, App. A | `wateront/physical.py` | `.inp` → Junction/Reservoir/Tank, Pipe/Pump/6 valve classes, DemandPattern, typed Curves, SimpleControl/Rule, reified OperationalStatus, sensors from `.inp` annotations, pressure zones |
-| §3.2 Asset Layer | `wateront/asset.py` | AssetRecord, FailureEvent (UKWIR modes), AssessmentRecord; literature-shaped priors or a real register CSV |
-| §3.3 Risk Layer | `wateront/risk.py` | Weibull conditional PoF, betweenness + simulated-flow hydraulic criticality, ISO 24510-style service criticality with pressure margin, ISO 55000-style matrix; risk bands are shared nodes |
-| §3.4 Decision Layer | `wateront/decision.py` | Guideline nodes, rules R1–R4, DecisionRecord `-[:SUPPORTED_BY]->` guideline, `-[:BASED_ON]->` evidence |
-| §3.5 Instantiation, Fig. 1 | `wateront/pipeline.py`, `wateront/kg.py` | In-memory property graph; optional Neo4j push with the Listing A.2 constraints |
-| §4 GraphRAG | `wateront/retrieval.py`, `wateront/graphrag.py` | Query planner (rules or Claude), graph traversal with explicit triples, TF-IDF/dense policy retrieval, template or LLM generation, citation verifier |
-| §5 Evaluation | `wateront/evaluation.py`, `wateront/baselines.py` | 6 intents × 3 paraphrases; Decision F1, Policy Recall, Traceability, Evidence Consistency, unsupported citations |
-| App. A OWL + SPARQL | `ontology/wateront.ttl`, `wateront/rdf_export.py` | OWL 2 axioms for all four layers; instance export; CQ1–CQ8 and upper-layer CQs |
-| Neo4j | `cypher/competency_questions.cypher` | Cypher versions of the competency questions |
+| §2.1 Physical Layer | `wateront/physical.py` | `.inp` → Junction/Reservoir/Tank, Pipe/Pump/valve classes, DemandPattern, typed Curves, controls, reified OperationalStatus, sensors from `.inp` annotations, supply zones (or DMAs from a register) |
+| §2.2 Asset Layer | `wateront/asset.py` | AssetRecord, FailureEvent, AssessmentRecord; registers and assessment logs, model clues, or priors, with provenance per attribute |
+| §2.3 Risk Layer | `wateront/risk.py` | Weibull failure probability per km, hydraulic and service criticality, monitoring status, overall risk (Negligible, Minor, Moderate, Major) as shared class nodes |
+| §2.4, §4.2 Decision Layer and policy | `wateront/decision.py` | Rules R0–R5, policy clauses, DecisionRecord `-[:SUPPORTED_BY]->` clause, `-[:BASED_ON]->` evidence |
+| §2.5 Instantiation, Fig. 1 | `wateront/pipeline.py`, `wateront/kg.py` | In-memory property graph; Neo4j and RDF/OWL export |
+| §3 GraphRAG | `wateront/retrieval.py`, `wateront/graphrag.py` | Query planner (keyword rules or LLM), graph traversal with evidence paths, policy-clause search, template or LLM answers, citation check |
+| §4–5 Evaluation | `wateront/evaluation.py`, `wateront/baselines.py`, `paper/experiments.py`, `paper/experiments_retrieval.py` | 8 question types × 3 phrasings; decision F1, policy recall and precision, traceability, evidence consistency, unsupported citations; tabular and flat-text RAG baselines |
+| Ontology and competency questions | `ontology/wateront.ttl`, `wateront/rdf_export.py`, `cypher/competency_questions.cypher` | OWL axioms for all four layers; SPARQL and Cypher competency questions |
 
 ## Quick start
 
@@ -54,21 +53,17 @@ python -m pytest -q tests
 
 Install as a package with `pip install -e .` (extras: `.[llm]`, `.[neo4j]`, `.[demo]`). Optional extras: `--neo4j bolt://localhost:7687` on `build` (credentials from `NEO4J_USER`/`NEO4J_PASSWORD`; each push replaces the previous WaterOnt graph, leaving any other data in the database untouched, so a rebuilt graph never mixes with an old one; `--keep-existing` merges instead, `--wipe` clears the whole database), and `--llm` on `ask`/`evaluate` to use Claude for planning, generation and an additional LLM-based flat-RAG baseline (needs `ANTHROPIC_API_KEY`; model set in `Config.llm_model`). Real data plugs in through `--assets` (see `data/asset_register_template.csv`, which overrides priors pipe by pipe) and `--guidelines` (see `data/guidelines_template.json`).
 
-## Results produced by this code (deterministic mode, seed 42)
+## Results reported in the paper (L-TOWN, seed 42)
 
-| Network | System | Decision F1 | Policy recall | Traceability | Evidence consistency |
-|---|---|---|---|---|---|
-| L-TOWN (905 pipes, 8 intents) | WaterOnt GraphRAG | 0.937 | 0.955 | 1.000 | 0.862 |
-| | Flat-document RAG | 0.010 | 0.010 | 0.000 | 0.391 |
-| | ML (GBM rank) | 0.050 | 0.000 | 0.000 | 0.917 |
-| Net3 (117 pipes, 6 intents) | WaterOnt GraphRAG | 0.958 | 0.984 | 1.000 | 0.883 |
-| | Flat-document RAG | 0.018 | 0.014 | 0.000 | 0.403 |
-| | ML (GBM rank) | 0.168 | 0.000 | 0.000 | 0.876 |
-| Net6 (3,829 pipes, 6 intents) | WaterOnt GraphRAG | 0.944 | 0.944 | 1.000 | 0.891 |
-| | Flat-document RAG | 0.002 | 0.001 | 0.000 | 0.404 |
-| | ML (GBM rank) | 0.121 | 0.000 | 0.000 | 0.889 |
+| System | Knowledge graph | LLM | Decision F1 | Policy recall | Policy precision | Traceability |
+|---|---|---|---|---|---|---|
+| Idealised table with the same rules | no | no | 0.937 | 0.955 | 0.930 | 1.000 |
+| WaterOnt | yes | no | 0.937 | 0.955 | 0.930 | 1.000 |
+| Flat-text RAG, TF-IDF retrieval | no | yes | 0.034 | 0.021 | 0.549 | 0.428 |
+| Flat-text RAG, dense retrieval | no | yes | 0.123 | 0.086 | 0.608 | 0.804 |
+| WaterOnt GraphRAG | yes | yes | 0.918 | 0.908 | 0.997 | 1.000 |
 
-Per-query detail is in `results/`. GraphRAG's shortfall from 1.0 comes entirely from the keyword planner misreading paraphrases (e.g. "relined rather than replaced" triggers both actions; "What maintenance is needed in the PRV-3 zone?" does not exclude Monitor), which is a useful honest finding about the planner rather than the graph.
+The deterministic results are reproduced exactly by `python paper/experiments.py`; across ten synthetic asset histories (seeds 42–51) decision F1 is 0.927 ± 0.006, and 0.958 on Net3 and 0.944 on Net6. The LLM rows come from one session of `paper/experiments_retrieval.py` (Claude Sonnet 5.5, 31 October 2026); LLM output can vary between runs. Every answer, per question, is in `paper/results/`; earlier runs are archived there with notes.
 
 ## L-TOWN
 
@@ -150,22 +145,10 @@ The network, hydraulics, sensors and demand categories are real model data; only
 
 The reference decisions are produced by applying the same encoded policy to the same recorded asset data, so Decision F1 measures faithful, query-correct application of policy, not real-world decision quality. To claim the latter, supply expert-labelled decisions with `evaluate --expert refs.csv` (columns `intent,pipe,action,guidelines`, guidelines `;`-separated).
 
-The lexical flat-RAG baseline is weak by construction, because TF-IDF similarity cannot evaluate conditions such as "age > design life". It is still informative, but reviewers will expect the stronger `--llm` variant (`Flat-document RAG + LLM`), where an LLM reasons over the top-k retrieved asset cards and policy text.
+The flat-text RAG baselines give an LLM the 40 pipe descriptions most similar to the question (TF-IDF or dense-vector retrieval) together with the full policy. Similarity retrieval places few of the relevant pipes in the context, which largely explains their scores; a language model given all pipe descriptions at once was not tested.
 
 All numeric priors in `config.py` (Weibull parameters, design lives, chronology, condition-review intervals) and the guideline texts in `decision.py` are illustrative placeholders shaped after AWWA M28, UKWIR, ISO 55000 and ISO 24510. They are not quotations or published values from those documents and should be replaced or cited precisely before publication. Hospitals, schools and care homes are synthetic and seeded; industrial customers come from the model's demand categories.
 
 ## Licence and citation
 
 Code: MIT ([`LICENSE`](LICENSE)). Ontology: CC BY 4.0 ([`ontology/LICENSE.md`](ontology/LICENSE.md)). The L-TOWN model (`data/networks/L-TOWN.inp`) is © KIOS Research and Innovation Center of Excellence, distributed under the European Union Public Licence v. 1.2 ([full text](data/networks/LICENSE-L-TOWN-EUPL-1.2.txt)); data derived from it, including the explorer page, remain under EUPL-1.2. See [`NOTICE.md`](NOTICE.md) for details, and cite this repository using [`CITATION.cff`](CITATION.cff) ("Cite this repository" on GitHub).
-
-## Notes on the manuscript draft
-
-While implementing, a few points in the LaTeX surfaced that you may want to fix:
-
-1. The Table A.5 footnote references `\cref{subsec:properties}`, which is not defined anywhere.
-2. A.3 says "the three upper-level classes are mutually disjoint", but the equation states two separate pairwise axioms. The `.ttl` uses `owl:AllDisjointClasses` over WaterNetwork, WaterNetworkElement and OperationalElement.
-3. `hasCurve` is marked functional with range `Curve`, but head pumps can also carry an efficiency curve, tanks a volume curve and GPVs a head-loss curve. The `.ttl` makes it non-functional with a union domain. The "exactly one PumpCurve" axiom also does not hold for EPANET power pumps.
-4. CQ7 uses `wno:value` and `wno:reason`, which are not declared in A.5. Table 1 lists `AssessmentRecord` and `DecisionRecord`, which the text does not describe.
-5. §3.1 claims instantiation was verified on C-Town; this repository tests Net3, Net6 and L-TOWN.
-6. The bibliography file is `Demand_decay` and the commented-out highlights belong to a different paper (network right-sizing).
-7. Section 3.2 says asset attributes come from literature priors. L-TOWN supports a stronger claim: part of them is inferred from the model itself (pipe series and roughness), with provenance recorded per attribute, and the sensor layout supports the SOSA/SSN link your literature review motivates.
