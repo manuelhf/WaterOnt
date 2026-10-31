@@ -48,11 +48,11 @@ def systems(res, cfg, llm: bool):
 GOLD = {
     "replacement": QueryPlan(actions=["Replacement"]),
     "rehabilitation": QueryPlan(actions=["Rehabilitation"]),
-    "inspection": QueryPlan(actions=["Inspection"]),
+    "assessment": QueryPlan(actions=["Assessment"]),
     "critical_high_pof": QueryPlan(bands={"hydraulic": ["High", "Critical"], "pof": ["High", "VeryHigh"]}),
     "critical_customers": QueryPlan(critical_facilities=True, exclude_monitor=True),
     "multimodal_pressure_age_policy": QueryPlan(material=["CI"], low_pressure=True, exclude_monitor=True),
-    "monitoring_gap": QueryPlan(unmonitored=True, bands={"hydraulic": ["High", "Critical"], "overall": ["Intolerable"]}),
+    "monitoring_gap": QueryPlan(unmonitored=True, bands={"hydraulic": ["High", "Critical"], "overall": ["Major"]}),
     "zone_prv3": QueryPlan(zones=["PRV-3"], exclude_monitor=True),
 }
 
@@ -105,7 +105,7 @@ def sensitivity(res, base_cfg):
                          replacements=sum(v.action == "Replacement" for v in d.values())))
     for f in (0.8, 0.9, 1.1, 1.2):
         record("Design life", f, replace(base_cfg, design_life={k: v * f for k, v in base_cfg.design_life.items()}))
-        record("Inspection intervals", f,
+        record("Condition-review intervals", f,
                replace(base_cfg, inspection_interval={k: v * f for k, v in base_cfg.inspection_interval.items()}))
         record("Weibull scale", f, replace(base_cfg, weibull={k: (b, e * f) for k, (b, e) in base_cfg.weibull.items()}))
         record("Hazard scale", f, replace(base_cfg, hazard_scale=base_cfg.hazard_scale * f))

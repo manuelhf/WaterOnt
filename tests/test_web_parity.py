@@ -21,8 +21,8 @@ QUERIES = ["Which pipes should be replaced?", "Which hydraulically critical pipe
            "Which cast iron pipes are past their design life?",
            "Which pipes have the smallest diameters?", "Which pipes have the biggest diameters?",
            "Which mains above 150 mm need intervention?", "Cast iron pipes below 150 mm that should be replaced",
-           "Large diameter mains above 100 mm with intolerable risk"]
-LTOWN_QUERIES = ["Which unmonitored hydraulically critical mains have intolerable risk?",
+           "Large diameter mains above 100 mm with major risk"]
+LTOWN_QUERIES = ["Which unmonitored hydraulically critical mains have major risk?",
                  "Which pipes downstream of PRV-3 need intervention?",
                  "Which mains in the tank zone should be replaced? top 5"]
 

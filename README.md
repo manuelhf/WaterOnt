@@ -16,21 +16,21 @@ WaterOnt is research software under active development: it runs on any EPANET mo
 recommendations follow an illustrative policy and, unless you supply your own records,
 synthetic asset histories. Use it to explore and to give feedback, not for operational decisions.
 
-1. **In the [explorer](https://manuelhf.github.io/WaterOnt/), press _Use my EPANET model (.inp)…_** and choose your `.inp`, plus any CSV files you have: an asset register or inspection log, a failure list, a sensor layout, critical customers.
+1. **In the [explorer](https://manuelhf.github.io/WaterOnt/), press _Use my EPANET model (.inp)…_** and choose your `.inp`, plus any CSV files you have: an asset register or condition-assessment log, a failure list, a sensor layout, critical customers.
 2. **Press _Copy code_, then _Open Google Colab_**, paste into the empty cell and run it (a Google account is needed; about a minute). Your files travel inside the code and are processed only in your own Colab session; Colab then downloads a network file (`.json`) with a summary of what came from your files and what is still synthetic.
 3. **Back in the explorer, press _Open the downloaded file_.** The file is read in your browser and not uploaded anywhere. *Back to the L-TOWN demo* (or reloading the page) returns to the demo.
-4. **Add or update data later** in the explorer's Data tab: *Import asset register* also accepts inspection logs, and sensor layouts can be imported or edited on the map.
+4. **Add or update data later** in the explorer's Data tab: *Import asset register* also accepts condition-assessment logs, and sensor layouts can be imported or edited on the map.
 
 Prefer a reusable notebook? The [converter notebook](https://colab.research.google.com/github/manuelhf/WaterOnt/blob/main/demo/WaterOnt_convert.ipynb) does the same with an upload button, and `python -m wateront convert model.inp register.csv` does it on your own computer.
 
-Files do not have to follow the templates in [`data/`](data/) exactly: column names such as "Pipe ID", "Last inspection" or "Installation year" are recognised; dates can stand in for years; materials can be written as names ("cast iron", "uPVC", "MDPE"); Excel CSV files with commas, semicolons or tabs all work. An inspection log may list a pipe several times: the most recent inspection wins. Supply zones are found automatically from the model (split at pumps and pressure/flow-control valves); to use your own DMAs, add a DMA column (or "Zone", "District") to the register, and those pipes move to your DMAs while the rest keep their automatic zone. Questions such as "Which pipes in DMA North-3 need intervention?" then work. A file with any invalid value is rejected as a whole, with every problem listed, so a register is never half-applied.
+Files do not have to follow the templates in [`data/`](data/) exactly: column names such as "Pipe ID", "Last assessment" (or "Last inspection") or "Installation year" are recognised; dates can stand in for years; materials can be written as names ("cast iron", "uPVC", "MDPE"); Excel CSV files with commas, semicolons or tabs all work. An inspection log may list a pipe several times: the most recent inspection wins. Supply zones are found automatically from the model (split at pumps and pressure/flow-control valves); to use your own DMAs, add a DMA column (or "Zone", "District") to the register, and those pipes move to your DMAs while the rest keep their automatic zone. Questions such as "Which pipes in DMA North-3 need intervention?" then work. A file with any invalid value is rejected as a whole, with every problem listed, so a register is never half-applied.
 
 ## Paper → code map
 
 | Paper | Module | What it does |
 |---|---|---|
 | §3.1 Physical Layer, App. A | `wateront/physical.py` | `.inp` → Junction/Reservoir/Tank, Pipe/Pump/6 valve classes, DemandPattern, typed Curves, SimpleControl/Rule, reified OperationalStatus, sensors from `.inp` annotations, pressure zones |
-| §3.2 Asset Layer | `wateront/asset.py` | AssetRecord, FailureEvent (UKWIR modes), InspectionRecord; literature-shaped priors or a real register CSV |
+| §3.2 Asset Layer | `wateront/asset.py` | AssetRecord, FailureEvent (UKWIR modes), AssessmentRecord; literature-shaped priors or a real register CSV |
 | §3.3 Risk Layer | `wateront/risk.py` | Weibull conditional PoF, betweenness + simulated-flow hydraulic criticality, ISO 24510-style service criticality with pressure margin, ISO 55000-style matrix; risk bands are shared nodes |
 | §3.4 Decision Layer | `wateront/decision.py` | Guideline nodes, rules R1–R4, DecisionRecord `-[:SUPPORTED_BY]->` guideline, `-[:BASED_ON]->` evidence |
 | §3.5 Instantiation, Fig. 1 | `wateront/pipeline.py`, `wateront/kg.py` | In-memory property graph; optional Neo4j push with the Listing A.2 constraints |
@@ -82,7 +82,7 @@ New queries this enables:
 
 ```bash
 python -m wateront build --inp data/networks/L-TOWN.inp --out ltown.pkl
-python -m wateront ask --kg ltown.pkl "Which unmonitored hydraulically critical mains have intolerable risk?"
+python -m wateront ask --kg ltown.pkl "Which unmonitored hydraulically critical mains have major risk?"
 python -m wateront ask --kg ltown.pkl "Which pipes downstream of PRV-3 need intervention?"
 python -m wateront ask --kg ltown.pkl "Which mains in the tank zone should be replaced? top 5"
 python -m wateront ask --kg ltown.pkl "Which pipes at low pressure need intervention?"
@@ -101,7 +101,7 @@ This trains the ML baseline on the 2019 labels (out-of-fold) and reports capture
 
 ## Demonstrators
 
-**Web explorer** (`demo/index.html`, published by GitHub Pages). One self-contained page with the L-TOWN graph embedded: a pannable map coloured by risk, action, zone, monitoring or material; an Ask tab using the same keyword planner as Python; a Pipe tab showing each recommendation's audit trail from asset record to authorising clause; and a Policy sandbox where changing design lives, PoF bands, inspection intervals or rule R5 recomputes every decision live. The policy rules and planner are re-implemented in JavaScript, and `tests/test_web_parity.py` runs them in Node to check they reproduce the Python decisions and answers exactly. Links like `demo/#p257` open that pipe directly.
+**Web explorer** (`demo/index.html`, published by GitHub Pages). One self-contained page with the L-TOWN graph embedded: a pannable map coloured by risk, action, zone, monitoring or material; an Ask tab using the same keyword planner as Python; a Pipe tab showing each recommendation's audit trail from asset record to authorising clause; and a Policy sandbox where changing design lives, PoF bands, condition-review intervals or rule R5 recomputes every decision live. The policy rules and planner are re-implemented in JavaScript, and `tests/test_web_parity.py` runs them in Node to check they reproduce the Python decisions and answers exactly. Links like `demo/#p257` open that pipe directly.
 
 **Saving work.** The explorer's **Save…** menu writes four files, all generated in the browser:
 
@@ -114,7 +114,7 @@ This trains the ML baseline on the 2019 labels (out-of-fold) and reports capture
 
 The Ask tab can also save a question's results as CSV, and the Pipe tab can save one pipe's audit trail as a Markdown report.
 
-**Editing pipes.** In the Pipe tab, **Edit asset record** changes install year, material, condition grade, last inspection, soil corrosivity and failure years. The failure probability and decision are recomputed at once with the same formulas as Python; `tests/test_web_parity.py` checks that browser edits, exported as an asset register and rebuilt in Python, give identical recommendations for every pipe. Hydraulic and service criticality come from network simulation and do not change in the browser. Edits stay in the page until saved in a network file, and the page warns before you leave with unsaved edits.
+**Editing pipes.** In the Pipe tab, **Edit asset record** changes install year, material, condition grade, last condition assessment, soil corrosivity and failure years. The failure probability and decision are recomputed at once with the same formulas as Python; `tests/test_web_parity.py` checks that browser edits, exported as an asset register and rebuilt in Python, give identical recommendations for every pipe. Hydraulic and service criticality come from network simulation and do not change in the browser. Edits stay in the page until saved in a network file, and the page warns before you leave with unsaved edits.
 
 **Asking Claude.** The Ask tab understands questions built from its known concepts (actions, risk bands, zones, materials, monitoring, pressure, dates and failure counts) and always shows how it read the question. For anything else, such as "why", comparisons or explanations, **Ask Claude about this** (on a pipe or on a question's results) copies your question together with the evidence, the policy in force and a summary of the rules, and opens claude.ai in a new tab: paste and send. Claude is asked to answer only from that evidence and to cite pipe and clause ids. This needs no API key and costs the site nothing; each person uses their own Claude account.
 
@@ -152,7 +152,7 @@ The reference decisions are produced by applying the same encoded policy to the 
 
 The lexical flat-RAG baseline is weak by construction, because TF-IDF similarity cannot evaluate conditions such as "age > design life". It is still informative, but reviewers will expect the stronger `--llm` variant (`Flat-document RAG + LLM`), where an LLM reasons over the top-k retrieved asset cards and policy text.
 
-All numeric priors in `config.py` (Weibull parameters, design lives, chronology, inspection intervals) and the guideline texts in `decision.py` are illustrative placeholders shaped after AWWA M28, UKWIR, ISO 55000 and ISO 24510. They are not quotations or published values from those documents and should be replaced or cited precisely before publication. Hospitals, schools and care homes are synthetic and seeded; industrial customers come from the model's demand categories.
+All numeric priors in `config.py` (Weibull parameters, design lives, chronology, condition-review intervals) and the guideline texts in `decision.py` are illustrative placeholders shaped after AWWA M28, UKWIR, ISO 55000 and ISO 24510. They are not quotations or published values from those documents and should be replaced or cited precisely before publication. Hospitals, schools and care homes are synthetic and seeded; industrial customers come from the model's demand categories.
 
 ## Licence and citation
 
@@ -165,7 +165,7 @@ While implementing, a few points in the LaTeX surfaced that you may want to fix:
 1. The Table A.5 footnote references `\cref{subsec:properties}`, which is not defined anywhere.
 2. A.3 says "the three upper-level classes are mutually disjoint", but the equation states two separate pairwise axioms. The `.ttl` uses `owl:AllDisjointClasses` over WaterNetwork, WaterNetworkElement and OperationalElement.
 3. `hasCurve` is marked functional with range `Curve`, but head pumps can also carry an efficiency curve, tanks a volume curve and GPVs a head-loss curve. The `.ttl` makes it non-functional with a union domain. The "exactly one PumpCurve" axiom also does not hold for EPANET power pumps.
-4. CQ7 uses `wno:value` and `wno:reason`, which are not declared in A.5. Table 1 lists `InspectionRecord` and `DecisionRecord`, which the text does not describe.
+4. CQ7 uses `wno:value` and `wno:reason`, which are not declared in A.5. Table 1 lists `AssessmentRecord` and `DecisionRecord`, which the text does not describe.
 5. §3.1 claims instantiation was verified on C-Town; this repository tests Net3, Net6 and L-TOWN.
 6. The bibliography file is `Demand_decay` and the commented-out highlights belong to a different paper (network right-sizing).
 7. Section 3.2 says asset attributes come from literature priors. L-TOWN supports a stronger claim: part of them is inferred from the model itself (pipe series and roughness), with provenance recorded per attribute, and the sensor layout supports the SOSA/SSN link your literature review motivates.

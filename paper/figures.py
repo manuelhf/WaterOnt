@@ -37,8 +37,10 @@ plt.rcParams.update({
     "xtick.major.size": 3, "ytick.major.size": 3, "legend.frameon": False,
     "savefig.bbox": "tight", "savefig.pad_inches": 0.02, "pdf.fonttype": 42,
 })
-RISK = {"Negligible": "#A6BDB7", "Tolerable": "#E1B941", "Significant": "#D9822B", "Intolerable": "#A8231C"}
-ACTION = {"Monitor": "#C9CFD2", "Inspection": "#2F6FB0", "Rehabilitation": "#7A4FB5", "Replacement": "#A8231C"}
+RISK = {"Negligible": "#A6BDB7", "Minor": "#E1B941", "Moderate": "#D9822B", "Major": "#A8231C"}
+ACTION = {"Monitor": "#C9CFD2", "Assessment": "#2F6FB0", "Rehabilitation": "#7A4FB5", "Replacement": "#A8231C"}
+# names shown in the figures; the data and result files keep the software's action names
+DISPLAY = {"Assessment": "Assessment"}
 ZONE = {"PRV-1+PRV-2": "#56B4E9", "PRV-3": "#E69F00", "PUMP_1+T1": "#009E73"}
 ZONE_LABEL = {"PRV-1+PRV-2": "Main zone (fed by PRV-1, PRV-2)", "PRV-3": "Sub-zone (fed by PRV-3)",
               "PUMP_1+T1": "Tank zone (fed by PUMP\\_1, T1)"}
@@ -146,8 +148,9 @@ def fig_risk_action(res):
         draw_sources(ax, res, size=12)
         map_axes(ax, res)
         counts = pd.Series([values[n] for n in names if n in values]).value_counts()
-        ax.legend(handles=[Line2D([], [], color=c, lw=2.4, label=f"{k} ({counts.get(k, 0)})") for k, c in palette.items()],
-                  loc="upper center", bbox_to_anchor=(0.5, -0.0), ncol=4, handlelength=1.6, borderaxespad=0)
+        ax.legend(handles=[Line2D([], [], color=c, lw=2.4, label=f"{DISPLAY.get(k, k)} ({counts.get(k, 0)})") for k, c in palette.items()],
+                  loc="upper center", bbox_to_anchor=(0.5, -0.0), ncol=4, handlelength=1.4,
+                  columnspacing=1.2, handletextpad=0.5, borderaxespad=0)
         ax.text(1.0, 1.0, lab, transform=ax.transAxes, ha="right", va="top", fontsize=9)
     fig.savefig(os.path.join(OUT, "fig_ltown_risk_action.pdf"))
     plt.close(fig)
@@ -188,8 +191,8 @@ def fig_sensitivity():
     base = json.load(open(os.path.join(RES, "meta.json")))["base_replacements"]
     groups = [("Weibull scale", "Weibull scale $\\eta$", "#A8231C", "o"),
               ("Design life", "Design life", "#7A4FB5", "s"),
-              ("Inspection intervals", "Inspection intervals", "#2F6FB0", "^"),
-              ("PoF band limits", "Failure-probability band limits", "#D9822B", "D"),
+              ("Condition-review intervals", "Condition-review intervals", "#2F6FB0", "^"),
+              ("PoF band limits", "Failure-probability class thresholds", "#D9822B", "D"),
               ("Hazard scale", "Hazard scale $\\kappa$", "#7F7F7F", "v")]
     fig, axes = plt.subplots(1, 2, figsize=(TEXTWIDTH_IN, 2.3))
     for g, lab, c, mk in groups:

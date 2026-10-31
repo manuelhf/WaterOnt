@@ -18,15 +18,15 @@
 ]
 %% entities
 \node[ent] (pipe) at (0,0) {\textbf{Pipe p520}\\ 49\,m, 100\,mm\\ main supply zone};
-\node[ent] (ar) at (-4.35,-2.05) {\textbf{AssetRecord}\\ asbestos cement (prior)\\ installed 1954, age 72\\ design life 60 years\\ grade 4; 1 failure\\ last inspected 2021};
+\node[ent] (ar) at (-4.35,-2.05) {\textbf{AssetRecord}\\ asbestos cement (prior)\\ installed 1954, age 72\\ design life 60 years\\ grade 4; 1 failure\\ last assessed 2021};
 \node[ent] (rp) at (0,-2.6) {\textbf{RiskProfile}\\ $P_{\mathrm{km}} = 0.70$\\ segment $P = 0.059$\\ risk score $4 \times 4 = 16$};
-\node[key] (dr) at (0,-5.35) {\textbf{DecisionRecord}\\ rule R1: Intolerable and age beyond design life};
+\node[key] (dr) at (0,-5.35) {\textbf{DecisionRecord}\\ rule R1: major risk and\\ age beyond design life};
 %% shared band nodes
 \node[band] (fp) at (4.45,-0.55) {FailureProbability\\ \textbf{Very high}};
 \node[band, below=0.22cm of fp] (hc) {HydraulicCriticality\\ \textbf{Critical}};
 \node[band, below=0.22cm of hc] (sc) {ServiceCriticality\\ \textbf{Critical}};
 \node[band, below=0.22cm of sc] (ms) {MonitoringStatus\\ \textbf{Unmonitored}};
-\node[band, below=0.22cm of ms] (or) {OverallRisk\\ \textbf{Intolerable}};
+\node[band, below=0.22cm of ms] (or) {OverallRisk\\ \textbf{Major}};
 %% outcome
 \node[key, text width=2.5cm, align=center] (act) at (-4.35,-7.55) {\textbf{Replacement}};
 \node[ent, text width=3.0cm] (g1) at (0.75,-7.55) {\textbf{G-REPL-01}\\ replacement at end of design life};

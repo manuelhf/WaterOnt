@@ -56,7 +56,7 @@ def test_every_pipe_has_full_stack(built):
 def test_replacement_implies_policy_conditions(built):
     for d in built.decisions:
         if d.action == "Replacement":
-            assert d.facts["overall"] == "Intolerable" and d.facts["age"] > d.facts["design_life"]
+            assert d.facts["overall"] == "Major" and d.facts["age"] > d.facts["design_life"]
             assert "G-REPL-01" in d.guidelines
 
 
@@ -192,7 +192,7 @@ def test_ltown_supply_zones(ltown):
 def test_ltown_per_km_banding_gives_nontrivial_risk(ltown):
     bands = ltown.risk.pof_band.value_counts()
     assert {"High", "VeryHigh"} <= set(bands.index)              # per-segment banding gave none
-    assert (ltown.risk.overall_risk == "Intolerable").any()
+    assert (ltown.risk.overall_risk == "Major").any()
 
 
 @needs_ltown
@@ -200,7 +200,7 @@ def test_ltown_zone_and_monitoring_queries(ltown):
     rag = GraphRAG(ltown.kg, use_llm=False)
     a = rag.ask("Which pipes downstream of PRV-3 need intervention?")
     assert a.recommendations and all(e.facts["zone"] == "PRV-3" for e in a.recommendations)
-    b = rag.ask("Which unmonitored hydraulically critical mains have intolerable risk?")
+    b = rag.ask("Which unmonitored hydraulically critical mains have major risk?")
     assert b.recommendations and all(e.facts["monitored"] is False for e in b.recommendations)
     assert all(rag.retriever.verify_path(e.path) for e in a.recommendations + b.recommendations)
 
@@ -303,11 +303,11 @@ def test_flat_llm_recovers_entries_from_truncated_answer(built, monkeypatch):
     """An answer cut off by the output limit keeps every complete entry (seen on Colab)."""
     import wateront.graphrag as gr
     from wateront.baselines import FlatRAGBaseline
-    reply = ('```json\n[\n{"pipe":"P:101","action":"Inspection","guidelines":["G-MON-02"]},\n'
+    reply = ('```json\n[\n{"pipe":"P:101","action":"Assessment","guidelines":["G-MON-02"]},\n'
              '{"pipe":"P:105","action":"Replacement","guidelines":["G-REPL-01"]},\n{"pipe":"P:1')
     monkeypatch.setattr(gr, "_anthropic_client", lambda: _FakeClient(reply))
-    ans = FlatRAGBaseline(built.kg, use_llm=True).ask("Which pipes need an inspection?")
-    assert [(e.pipe_uid, e.action) for e in ans.recommendations] == [("P:101", "Inspection"), ("P:105", "Replacement")]
+    ans = FlatRAGBaseline(built.kg, use_llm=True).ask("Which pipes need a condition assessment?")
+    assert [(e.pipe_uid, e.action) for e in ans.recommendations] == [("P:101", "Assessment"), ("P:105", "Replacement")]
 
 
 class _SequenceClient:
@@ -513,7 +513,7 @@ def test_converter_builds_a_network_file_for_the_explorer(tmp_path):
     d = json.load(open(out))
     assert d["format"] == "wateront-web/1" and len(d["pipes"]) == 117
     text = "\n".join(summary)
-    assert "Asset register / inspection log: inspection_log.csv" in text and "Sensor layout" in text
+    assert "Asset register / assessment log: inspection_log.csv" in text and "Sensor layout" in text
     assert "no node coordinates" not in text
 
 
