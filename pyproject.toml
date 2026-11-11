@@ -6,7 +6,8 @@ build-backend = "setuptools.build_meta"
 name = "wateront"
 version = "0.2.0"
 requires-python = ">=3.10"
-dependencies = ["wntr>=1.2", "networkx>=3.0", "numpy>=1.24", "pandas>=2.0", "scikit-learn>=1.3", "rdflib>=7.0"]
+dependencies = ["wntr>=1.2", "six", "networkx>=3.0", "numpy>=1.24", "pandas>=2.0", "scikit-learn>=1.3", "rdflib>=7.0"]
+# six: WNTR imports it without declaring it, and python-dateutil 4 no longer brings it in
 
 [project.optional-dependencies]
 llm = ["anthropic>=0.40"]
