@@ -1,0 +1,2 @@
+system,decision_f1,policy_recall,traceability,unsupported_citations,policy_precision,evidence_consistency
+"No KG, LLM (full context)",0.6293171659108255,0.5164807852965748,0.6932651072124756,0.0,0.9228947368421053,0.6827563199712878
