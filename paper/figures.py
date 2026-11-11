@@ -219,6 +219,59 @@ def fig_sensitivity():
     plt.close(fig)
 
 
+LLM_SYSTEMS = [("No KG, LLM (TF-IDF RAG)", "TF-IDF RAG", "retrieval_rag_per_query.csv"),
+               ("No KG, LLM (dense RAG)", "Dense RAG", "retrieval_rag_per_query.csv"),
+               ("No KG, LLM (full context)", "Full-context LLM", "full_context_per_query.csv"),
+               ("KG, LLM (WaterOnt GraphRAG)", "GraphRAG", "retrieval_rag_per_query.csv")]
+
+
+def llm_recommendation_counts(res):
+    """Per LLM configuration, the returned (pipe, action) pairs over the 24 questions, split into:
+    correct and among the 25 highest-priority pipes of the reference; correct under the policy
+    but outside those 25; and not supported by the policy."""
+    import json
+    from wateront.evaluation import default_intents, reference
+    cfg = Config(seed=42)
+    full = {it.key: {(p, a) for p, a, _ in reference(res.kg, it, cfg, capped=False)} for it in default_intents(res.kg)}
+    top = {it.key: {(p, a) for p, a, _ in reference(res.kg, it, cfg)} for it in default_intents(res.kg)}
+    rows = []
+    for system, label, fname in LLM_SYSTEMS:
+        pq = pd.read_csv(os.path.join(RES, fname))
+        pq = pq[pq.system == system]
+        c_top = c_low = wrong = 0
+        for x in pq.itertuples():
+            pred = {(p, a) for p, a, _ in json.loads(x.predictions)}
+            c_top += len(pred & top[x.intent]); c_low += len((pred & full[x.intent]) - top[x.intent])
+            wrong += len(pred - full[x.intent])
+        rows.append(dict(label=label, decision_f1=pq.decision_f1.mean(), policy_precision=pq.policy_precision.mean(),
+                         correct_top=c_top, correct_lower=c_low, not_supported=wrong))
+    return pd.DataFrame(rows)
+
+
+def fig_llm_comparison(res):
+    d = llm_recommendation_counts(res)
+    fig, (a, b) = plt.subplots(1, 2, figsize=(TEXTWIDTH_IN, 2.15),
+                               gridspec_kw=dict(width_ratios=[1.15, 1.15], wspace=0.6))
+    x = np.arange(len(d)); w = 0.37
+    a.bar(x - w / 2, d.decision_f1, w, color="#2F6FB0", label="Decision F1")
+    a.bar(x + w / 2, d.policy_precision, w, color="#A6BDB7", label="Policy precision")
+    a.set_xticks(x); a.set_xticklabels(["TF-IDF\nRAG", "Dense\nRAG", "Full-\ncontext", "Graph-\nRAG"], fontsize=7.5)
+    a.set_ylim(0, 1.0); a.set_yticks([0, 0.25, 0.5, 0.75, 1.0]); a.set_ylabel("Score")
+    a.legend(loc="upper center", bbox_to_anchor=(0.5, -0.30), ncol=1, frameon=False, fontsize=7.5, handlelength=1.0)
+    panel(a, "(a)")
+    parts = [("correct_top", "Correct, highest priority", "#2F6FB0"), ("correct_lower", "Correct, lower priority", "#A6BDB7"),
+             ("not_supported", "Not supported by the policy", "#D9822B")]
+    left = np.zeros(len(d))
+    for col, lab, colr in parts:
+        b.barh(x, d[col], left=left, color=colr, label=lab, height=0.6); left += d[col]
+    b.set_yticks(x); b.set_yticklabels(["TF-IDF RAG", "Dense RAG", "Full-context", "GraphRAG"], fontsize=7.5)
+    b.invert_yaxis(); b.set_xlim(0, 500); b.set_xlabel("Recommendations, 24 questions")
+    b.legend(loc="upper center", bbox_to_anchor=(0.4, -0.30), ncol=1, frameon=False, fontsize=7.5, handlelength=1.0)
+    panel(b, "(b)")
+    fig.savefig(os.path.join(OUT, "fig_llm_comparison.pdf")); plt.close(fig)
+    return d
+
+
 def main():
     os.makedirs(OUT, exist_ok=True)
     res = build_knowledge_graph(LTOWN, Config(seed=42), verbose=False)
@@ -226,6 +279,7 @@ def main():
     fig_risk_action(res)
     fig_banding()
     fig_sensitivity()
+    fig_llm_comparison(res)
     print("figures written to", OUT)
 
 

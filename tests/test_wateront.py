@@ -561,3 +561,36 @@ def test_user_dmas_replace_automatic_zones_only_where_given():
     zone = lambda p: res.kg.node(res.kg.one(f"P:{p}", "IN_ZONE"))["name"]
     assert zone("101") == "North-1" and zone("111") == "South-2" and zone("113") != "" and "North" not in zone("113")
     assert rag.ask("Which pipes in the zone fed by the tank need intervention?").plan.zones == ["tank"]
+
+
+def test_full_context_llm_gets_every_pipe_and_the_cap(built, monkeypatch):
+    """Full-context baseline: no retrieval, every pipe description in the prompt, the same
+    instruction plus a cap of 25 pipes; the retrieval baselines are unchanged."""
+    import wateront.graphrag as gr
+    from wateront.baselines import FlatRAGBaseline
+    seen = {}
+    def fake():
+        def create(**kw):
+            seen["system"], seen["user"] = kw["system"], kw["messages"][0]["content"]
+            return types.SimpleNamespace(content=[types.SimpleNamespace(type="text", text="[]")], stop_reason="end_turn")
+        return types.SimpleNamespace(messages=types.SimpleNamespace(create=create))
+    monkeypatch.setattr(gr, "_anthropic_client", fake)
+    full = FlatRAGBaseline(built.kg, use_llm=True, retriever="all")
+    full.ask("Which pipes should be replaced?")
+    pipes = [p for p in built.kg.nodes("Pipe")]
+    assert all(f"[{p}]" in seen["user"] for p in pipes)
+    assert seen["system"].startswith(FlatRAGBaseline.LLM_SYSTEM) and "at most 25 pipes" in seen["system"]
+    FlatRAGBaseline(built.kg, use_llm=True, retriever="tfidf").ask("Which pipes should be replaced?")
+    assert seen["system"] == FlatRAGBaseline.LLM_SYSTEM            # other baselines unchanged
+
+
+def test_flat_descriptions_carry_zone_and_monitoring(built):
+    """Flat-text baselines must see the same facts as the graph, including supply zone and
+    monitoring status (needed for the zone and monitoring-gap questions and for rule R5)."""
+    from wateront.baselines import FlatRAGBaseline
+    from wateront.decision import pipe_facts
+    flat = FlatRAGBaseline(built.kg, use_llm=True)
+    for d in [d for d in flat.index.docs if d["kind"] == "asset"]:
+        f = pipe_facts(built.kg, d["id"])
+        assert ("supply zone fed by" in d["text"] or "In DMA" in d["text"]) and f["zone"] in d["text"]
+        assert ("No pressure sensor" in d["text"]) == (not f["monitored"])

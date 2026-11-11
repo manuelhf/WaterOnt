@@ -14,6 +14,8 @@ Both expose `ask(query) -> Answer` so they are scored by the same evaluator.
 """
 from __future__ import annotations
 
+import re
+
 import numpy as np
 import pandas as pd
 from sklearn.ensemble import GradientBoostingClassifier
@@ -97,7 +99,19 @@ def asset_card(f: dict) -> str:
             f"{f['condition_grade']}. {f['failure_count']} recorded failures. Failure probability "
             f"{f['pof_band']}. Hydraulic criticality {f['hydraulic']}. Service criticality "
             f"{f['service']}. Overall risk {f['overall']}. Minimum pressure {f['min_end_pressure']} m. "
-            f"Last assessed {f['last_inspection_year']}. {fac}")
+            f"Last assessed {f['last_inspection_year']}. {zone_text(f.get('zone'))}"
+            f"{'Pressure sensor within two links.' if f.get('monitored') else 'No pressure sensor within two links.'} "
+            f"{fac}")
+
+
+def zone_text(zone) -> str:
+    """Supply zone as stated in the pipe description: automatic zones are named after the
+    devices that feed them; a utility's own DMAs are named directly."""
+    if not zone:
+        return ""
+    if re.match(r"^(PRV-|PSV-|PUMP_|T\d|R\d)", str(zone), re.I):
+        return f"In the supply zone fed by {zone}. "
+    return f"In DMA {zone}. "
 
 
 class FlatRAGBaseline:
@@ -106,7 +120,9 @@ class FlatRAGBaseline:
     def __init__(self, kg: KnowledgeGraph, cfg: Config | None = None, use_llm: bool = False,
                  k_cards: int = 40, retriever: str = "tfidf", embed=None, query_prefix: str = ""):
         """retriever: how the 40 most similar entries are found in the combined index of pipe
-        descriptions and policy clauses ('tfidf', 'bm25' or 'dense'). Nothing else changes."""
+        descriptions and policy clauses ('tfidf', 'bm25' or 'dense'). Nothing else changes.
+        retriever='all' (full context): no retrieval, the LLM is given every pipe description,
+        and asked to list at most `full_context_top_k` pipes, most urgent first."""
         self.kg, self.cfg, self.use_llm, self.k_cards = kg, cfg or Config(), use_llm, k_cards
         self.retriever = retriever
         if use_llm:
@@ -116,7 +132,8 @@ class FlatRAGBaseline:
         docs = [dict(id=p, kind="asset", title="", text=asset_card(f)) for p, f in self.facts.items()]
         docs += [dict(id=g["id"], kind="policy", title=g["title"], text=g["text"]) for g in self.guidelines]
         from .retrieval import make_index
-        self.index = make_index(docs, retriever, embed=embed, query_prefix=query_prefix)
+        self.index = make_index(docs, "tfidf" if retriever == "all" else retriever, embed=embed,
+                                query_prefix=query_prefix)
         self.policy_index = VectorIndex([g for g in self.guidelines if g["topic"] in TOPIC_ACTION])
 
     def ask(self, query: str) -> Answer:
@@ -151,6 +168,10 @@ class FlatRAGBaseline:
                   "ids that authorise it. Reply with JSON only: a list of objects with keys "
                   "pipe (the id in brackets, e.g. P:101), action, guidelines (list of clause ids).")
 
+    FULL_CONTEXT_NOTE = (" You are given every pipe in the network: list at most {k} pipes that answer "
+                         "the question, most urgent first.")
+    full_context_top_k = 25
+
     def _ask_llm(self, query: str) -> Answer:
         """Conventional RAG: top-k flat chunks by similarity, LLM reasons over the text."""
         import json
@@ -158,15 +179,20 @@ class FlatRAGBaseline:
 
         from .graphrag import _anthropic_client
         plan = plan_rules(query)
-        hits = self.index.search(query, k=self.k_cards)
-        cards = [d for d, _ in hits if d["kind"] == "asset"]
+        if self.retriever == "all":          # full context: every pipe, no retrieval
+            cards = [d for d in self.index.docs if d["kind"] == "asset"]
+            system = self.LLM_SYSTEM + self.FULL_CONTEXT_NOTE.format(k=self.full_context_top_k)
+        else:
+            hits = self.index.search(query, k=self.k_cards)
+            cards = [d for d, _ in hits if d["kind"] == "asset"]
+            system = self.LLM_SYSTEM
         # the whole policy (12 clauses) is short, so the LLM is given all of it
         policy = [dict(id=g["id"], kind="policy", title=g["title"], text=g["text"]) for g in self.guidelines]
         ctx = "\n".join(f"[{d['id']}] {d['text']}" for d in cards) + "\n\nPolicy:\n" + \
             "\n".join(f"[{g['id']}] {g['title']}: {g['text']}" for g in policy)
         msg = _anthropic_client().messages.create(
             model=self.cfg.llm_model, max_tokens=self.cfg.llm_max_tokens_flat,
-            system=self.LLM_SYSTEM,
+            system=system,
             messages=[{"role": "user", "content": f"{ctx}\n\nQuestion: {query}"}])
         raw = "".join(b.text for b in msg.content if b.type == "text")
         if getattr(msg, "stop_reason", None) == "max_tokens":
